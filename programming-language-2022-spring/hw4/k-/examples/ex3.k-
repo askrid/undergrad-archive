@@ -1,0 +1,65 @@
+(* Exercise 3 "K- 프로그래밍: 구조물 데이터 *)
+
+let proc leaf (i) =
+  { value := i, left := unit, right := unit }
+in
+
+let proc makeLtree (i, tree) =
+  { value := i, left := tree, right := leaf(unit) }
+in
+
+let proc makeRtree (i, tree) =
+  { value := i, left := leaf(unit), right := tree }
+in
+
+let proc makeTree (i, ltree, rtree) =
+  { value := i, left := ltree, right := rtree }
+in
+
+let proc isEmpty (tree) =
+  if tree.value = unit then true else false
+in
+
+let proc rTree (tree) =
+  tree.right
+in
+
+let proc lTree (tree) =
+  tree.left
+in
+
+let proc nodeVal (tree) =
+  tree.value
+in
+
+let proc dft (tree) =
+  if tree = unit then unit
+  else
+    (
+      if isEmpty(tree) then unit
+      else
+        (
+          write(nodeVal(tree));
+          dft(lTree(tree));
+          dft(rTree(tree));
+          unit
+        )
+    )
+in
+
+let proc bft (tree) =
+  if tree = unit then unit
+  else
+  (
+    if isEmpty(tree) then unit
+    else
+    (
+      bft(lTree(tree));
+      write(nodeVal(tree));
+      bft(rTree(tree));
+      unit
+    )
+  )
+in
+
+2019

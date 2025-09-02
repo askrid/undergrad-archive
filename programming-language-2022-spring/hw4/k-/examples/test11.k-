@@ -1,0 +1,6 @@
+(* Private test case 11 : Record *)
+
+let x := {a := 1, b := false} in
+write x.c
+
+(* Output : raises error "Error : InvalidField *)

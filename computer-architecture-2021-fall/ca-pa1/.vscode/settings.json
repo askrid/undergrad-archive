@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "locale": "c",
+        "ostream": "c",
+        "streambuf": "c",
+        "stdio.h": "c"
+    }
+}
