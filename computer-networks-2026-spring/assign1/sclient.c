@@ -73,7 +73,7 @@ main(const int argc, const char** argv)
     iobuf = (char *)malloc(MAX_HDR + MAX_CONT + 1);
     if (iobuf == NULL) {
         perror("malloc() failed");
-        exit(-1);
+        goto cleanup;
     }
 
     content = iobuf + MAX_HDR;
@@ -93,7 +93,7 @@ main(const int argc, const char** argv)
 
     /* empty input: error */
     if (content_len == 0) {
-        fprintf(stderr, "error: empty input\n");
+        fprintf(stderr, "input should be bigger than 0\n");
         goto cleanup;
     }
 
