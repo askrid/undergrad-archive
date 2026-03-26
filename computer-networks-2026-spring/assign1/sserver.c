@@ -45,7 +45,7 @@ readn(int fd, char *buf, size_t len)
 /*--------------------------------------------------------------------------------*/
 /* read header byte-by-byte until \r\n\r\n; returns header length or -1 */
 static int
-read_header(int fd, char *buf, size_t cap)
+read_hdr(int fd, char *buf, size_t cap)
 {
     size_t len = 0;
     while (len < cap) {
@@ -62,7 +62,7 @@ read_header(int fd, char *buf, size_t cap)
 }
 /*--------------------------------------------------------------------------------*/
 static char *
-skip_ws(char *p)
+sskip(char *p)
 {
     while (*p != '\0' && isspace((unsigned char)*p))
         p++;
@@ -70,7 +70,7 @@ skip_ws(char *p)
 }
 /*--------------------------------------------------------------------------------*/
 static void
-trim_end(char *start)
+rtrim(char *start)
 {
     char *end = start + strlen(start);
     while (end > start && isspace((unsigned char)*(end - 1)))
@@ -81,7 +81,7 @@ trim_end(char *start)
 /* parse request header; returns 0 on success, -1 on bad request.
    hdr is modified in place (null-terminated at line boundaries). */
 static int
-parse_header(char *hdr, int hdr_len, long *content_len_out)
+parse_hdr(char *hdr, int hdr_len, long *content_len_out)
 {
     int has_host = FALSE;
     int has_content_length = FALSE;
@@ -106,14 +106,14 @@ parse_header(char *hdr, int hdr_len, long *content_len_out)
             q += 4;
             if (!isspace((unsigned char)*q))
                 return -1;
-            q = skip_ws(q);
+            q = sskip(q);
             if (strncmp(q, "message", 7) != 0)
                 return -1;
             q += 7;
             if (!isspace((unsigned char)*q))
                 return -1;
-            q = skip_ws(q);
-            trim_end(q);
+            q = sskip(q);
+            rtrim(q);
             if (strcmp(q, "SIMPLE/1.0") != 0)
                 return -1;
         } else {
@@ -123,8 +123,8 @@ parse_header(char *hdr, int hdr_len, long *content_len_out)
                 return -1;
 
             size_t name_len = colon - p;
-            char *value = skip_ws(colon + 1);
-            trim_end(value);
+            char *value = sskip(colon + 1);
+            rtrim(value);
 
             if (name_len == 4 && strncasecmp(p, "Host", 4) == 0) {
                 if (strlen(value) == 0)
@@ -157,7 +157,7 @@ handle_client(int connfd)
 
     /* read request header */
     char hdr[MAX_HDR];
-    int hdr_len = read_header(connfd, hdr, MAX_HDR);
+    int hdr_len = read_hdr(connfd, hdr, MAX_HDR);
     if (hdr_len < 0) {
         writen(connfd, BAD_REQUEST, strlen(BAD_REQUEST));
         goto bye;
@@ -165,7 +165,7 @@ handle_client(int connfd)
 
     /* parse request header */
     long content_len = 0;
-    if (parse_header(hdr, hdr_len, &content_len) < 0) {
+    if (parse_hdr(hdr, hdr_len, &content_len) < 0) {
         writen(connfd, BAD_REQUEST, strlen(BAD_REQUEST));
         goto bye;
     }

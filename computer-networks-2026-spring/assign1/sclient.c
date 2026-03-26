@@ -96,11 +96,8 @@ handle_resp(char *resp, size_t len)
         }
         writen(STDOUT_FILENO, body, body_len);
     } else {
-        /* error response: write entire response header */
-        if (body != NULL)
-            writen(STDOUT_FILENO, resp, body - resp);
-        else
-            writen(STDOUT_FILENO, resp, len);
+        /* error response or no body: write the response header */
+        writen(STDOUT_FILENO, resp, len);
     }
 
     return 0;
@@ -173,7 +170,7 @@ main(const int argc, const char** argv)
     /* resolve server address */
     struct hostent *hp = gethostbyname(server);
     if (hp == NULL) {
-        fprintf(stderr, "gethostbyname() failed: %s\n", strerror(errno));
+        perror("gethostbyname() failed");
         goto cleanup;
     }
 
