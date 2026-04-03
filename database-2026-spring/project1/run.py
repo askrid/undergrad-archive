@@ -8,7 +8,7 @@ from lark import Lark, UnexpectedInput, Transformer
 
 PROMPT = "DB_2020-17316> "
 GRAMMAR_FILE = "grammar.lark"
-DEBUG = True
+DEBUG = False
 
 parser: Lark|None = None
 parser_future: Future[Lark] = Future()
@@ -23,10 +23,10 @@ class NoopTransformer(Transformer):
     type Result = str|None
 
     def create_table_query(self, _) -> str:
-        return "'CREATE TABLE requested"
+        return "'CREATE TABLE' requested"
 
     def drop_table_query(self, _) -> str:
-        return "'DROP TABLE requested"
+        return "'DROP TABLE' requested"
 
     def explain_query(self, _) -> str:
         return "'EXPLAIN' requested"
@@ -78,6 +78,7 @@ def build_parser_concurrent():
         try:
             filepath = os.path.join(os.path.dirname(__file__), GRAMMAR_FILE)
             with open(filepath, 'r') as f:
+                # Lexer MUST be basic to disallow keywords as identifiers.
                 result = Lark(f, debug=DEBUG, strict=DEBUG, start="command",
                               lexer="basic", parser="lalr",
                               transformer=NoopTransformer())

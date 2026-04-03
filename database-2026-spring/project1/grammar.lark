@@ -102,7 +102,7 @@ desc_query : DESC table_name
 show_tables_query : SHOW TABLES
 
 // RENAME TABLE
-rename_table_query : RENAME table_name TO table_name ("," table_name TO table_name)*
+rename_table_query : RENAME TABLE table_name TO table_name ("," table_name TO table_name)*
 
 // TRUNCATE TABLE
 truncate_table_query : TRUNCATE TABLE table_name
