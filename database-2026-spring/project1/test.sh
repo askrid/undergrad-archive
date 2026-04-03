@@ -26,11 +26,11 @@ echo "=== 1. All query types ==="
 
 run_test "CREATE TABLE" \
     "CREATE TABLE t (id int, PRIMARY KEY (id));" \
-    "${P}'CREATE TABLE requested"
+    "${P}'CREATE TABLE' requested"
 
 run_test "DROP TABLE" \
     "DROP TABLE t;" \
-    "${P}'DROP TABLE requested"
+    "${P}'DROP TABLE' requested"
 
 run_test "EXPLAIN" \
     "EXPLAIN t;" \
@@ -49,7 +49,7 @@ run_test "SHOW TABLES" \
     "${P}'SHOW TABLES' requested"
 
 run_test "RENAME TABLE" \
-    "RENAME t TO s;" \
+    "RENAME TABLE t TO s, t TO s;" \
     "${P}'RENAME TABLE' requested"
 
 run_test "TRUNCATE TABLE" \
@@ -107,7 +107,7 @@ ${P}'DELETE' requested"
 run_test "Three queries on one line" \
     "SELECT * FROM t; DROP TABLE t; SHOW TABLES;" \
     "${P}'SELECT' requested
-${P}'DROP TABLE requested
+${P}'DROP TABLE' requested
 ${P}'SHOW TABLES' requested"
 
 echo ""
@@ -115,7 +115,7 @@ echo "=== 3. Query split across multiple lines ==="
 
 run_test "CREATE TABLE multiline" \
     "$(printf 'CREATE TABLE t\n(id int,\nPRIMARY KEY (id));')" \
-    "${P}'CREATE TABLE requested"
+    "${P}'CREATE TABLE' requested"
 
 run_test "SELECT multiline" \
     "$(printf 'SELECT *\nFROM t\nWHERE a = 1;')" \
@@ -131,8 +131,8 @@ ${P}'DELETE' requested"
 
 run_test "Three queries across lines" \
     "$(printf 'CREATE TABLE t\n(id int); DROP\nTABLE t; SHOW\nTABLES;')" \
-    "${P}'CREATE TABLE requested
-${P}'DROP TABLE requested
+    "${P}'CREATE TABLE' requested
+${P}'DROP TABLE' requested
 ${P}'SHOW TABLES' requested"
 
 echo ""
