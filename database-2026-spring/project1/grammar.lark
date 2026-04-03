@@ -45,19 +45,12 @@ AS : "as"i
 IS : "is"i
 OR : "or"i
 AND : "and"i
-COMP_OP : LESSTHAN | LESSEQUAL | EQUAL | GREATERTHAN | GREATEREQUAL | NOTEQUAL
 INSERT : "insert"i
 INTO : "into"i
 VALUES : "values"i
 DELETE : "delete"i
 UPDATE : "update"i
 SET : "set"i
-LESSTHAN : "<"
-LESSEQUAL : "<="
-GREATERTHAN: ">"
-GREATEREQUAL : ">="
-EQUAL: "="
-NOTEQUAL: "!="
 LIMIT: "limit"i
 OFFSET: "offset"i
 
@@ -132,7 +125,8 @@ boolean_test : predicate
 parenthesized_boolean_expr : LP boolean_expr RP
 predicate : comparison_predicate
           | null_predicate
-comparison_predicate : comp_operand COMP_OP comp_operand
+comparison_predicate : comp_operand comp_op comp_operand
+comp_op : "<" | "<=" | "=" | ">" | ">=" | "!="
 comp_operand : comparable_value
              | [table_name "."] column_name
 comparable_value : INT | STR | DATE
@@ -150,7 +144,7 @@ value : INT | STR | DATE
 delete_query : DELETE FROM table_name [where_clause]
 
 // UPDATE
-update_query : UPDATE table_name SET column_name EQUAL value [where_clause]
+update_query : UPDATE table_name SET column_name "=" value [where_clause]
 
 // EXIT
 exit_query : EXIT
