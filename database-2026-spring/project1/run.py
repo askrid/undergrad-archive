@@ -79,7 +79,8 @@ def build_parser_concurrent():
             filepath = os.path.join(os.path.dirname(__file__), GRAMMAR_FILE)
             with open(filepath, 'r') as f:
                 result = Lark(f, debug=DEBUG, strict=DEBUG, start="command",
-                              parser="lalr", transformer=NoopTransformer())
+                              lexer="basic", parser="lalr",
+                              transformer=NoopTransformer())
             parser_future.set_result(result)
         except Exception as e:
             parser_future.set_exception(e)
