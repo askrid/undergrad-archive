@@ -27,7 +27,7 @@ EXPLAIN : "explain"i
 DESCRIBE: "describe"i
 DESC : "desc"i
 SHOW : "show"i
-RENAME : "RENAME"i
+RENAME : "rename"i
 TO : "to"i
 TRUNCATE : "truncate"i
 TABLE : "table"i
