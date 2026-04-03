@@ -4,7 +4,7 @@ SPYTHON = python3.12
 VENV = .venv
 FILES = run.py grammar.lark requirements.txt README.md README.pdf Makefile test.sh
 
-all: $(VENV)
+run: $(VENV)
 	$(VENV)/bin/python run.py
 
 $(VENV): requirements.txt
@@ -22,5 +22,5 @@ clean:
 	rm -f $(SUBMITFILE).zip
 	rm -rf $(VENV)
 
-.PHONY: all test submit clean
+.PHONY: run test submit clean
 
