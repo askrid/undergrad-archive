@@ -63,21 +63,20 @@ OFFSET: "offset"i
 
 
 // QUERY
-start : command
-command : query_list | EXIT ";"
-query_list : (query ";")+
+command : query
 query : create_table_query
       | drop_table_query
       | explain_query
       | describe_query
       | desc_query
-      | show_query
-      | rename_query
+      | show_tables_query
+      | rename_table_query
       | truncate_table_query
       | select_query
       | insert_query
       | delete_query
       | update_query
+      | exit_query
 
 // CREATE TABLE
 create_table_query : CREATE TABLE table_name table_element_list
@@ -107,10 +106,10 @@ describe_query : DESCRIBE table_name
 desc_query : DESC table_name
 
 // SHOW TABLES
-show_query : SHOW TABLES
+show_tables_query : SHOW TABLES
 
 // RENAME TABLE
-rename_query : RENAME table_name TO table_name ("," table_name TO table_name)*
+rename_table_query : RENAME table_name TO table_name ("," table_name TO table_name)*
 
 // TRUNCATE TABLE
 truncate_table_query : TRUNCATE TABLE table_name
@@ -152,4 +151,7 @@ delete_query : DELETE FROM table_name [where_clause]
 
 // UPDATE
 update_query : UPDATE table_name SET column_name EQUAL value [where_clause]
+
+// EXIT
+exit_query : EXIT
 
