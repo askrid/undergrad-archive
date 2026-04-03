@@ -7,6 +7,19 @@
 - You can run `make test` to automatically setup the virtual environment and run the test on the parser.
 - Or, you can manually setup the environment as `requirements.txt` is provided.
 
+### Requirements
+
+This is the copy of `requirements.txt`.
+
+```
+interegular==0.3.3
+lark==1.3.1
+nodeenv==1.10.0
+nodejs-wheel-binaries==24.14.1
+pyright==1.1.408
+typing_extensions==4.15.0
+```
+
 ## Implementation
 
 ### `grammar.lark`
