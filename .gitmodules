@@ -1,0 +1,6 @@
+[submodule "operating-systems-2025-fall/xv6-riscv-snu"]
+	path = operating-systems-2025-fall/xv6-riscv-snu
+	url = git@github.com:askrid/xv6-riscv-snu
+[submodule "natural-language-processing-2025-fall/multilang-simtrans"]
+	path = natural-language-processing-2025-fall/multilang-simtrans
+	url = git@github.com:askrid/multilang-simtrans
