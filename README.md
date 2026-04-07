@@ -1,2 +1,1 @@
-An archive of coursework from my CSE undergraduate life
-
+My CS coursework archive, nothing to see here.
