@@ -27,9 +27,14 @@ def build_glados() -> Node:
     Build a GLaDOS model.
     """
     ceil_base = Node("ceil_base", Mat4.from_translation(Vec3(0, 7, 0)))
+    joint_ceil_disc = Node(
+        "ceil_disc",
+        Mat4.from_rotation(math.radians(0), Vec3(0, 1, 0)), # joint
+        geometry=Frustum(bottom_radius=1.5, top_radius=1.5, height=0.1, color=COLOR_GREY),
+    )
     ceil_drum = Node(
         "ceil_drum",
-        Mat4.from_translation(Vec3(0, 0, 0))
+        Mat4.from_translation(Vec3(0, -0.6, 0))
         @ Mat4.from_rotation(math.radians(90), Vec3(0, 0, 1)),
         geometry=Frustum(
             bottom_radius=0.5,
@@ -67,7 +72,7 @@ def build_glados() -> Node:
     )
     torso_arm_center_bridge = Node(
         "torso_arm_center_bridge",
-        Mat4.from_translation(Vec3(-0.53,0.12,0)),
+        Mat4.from_translation(Vec3(-0.53, 0.12, 0)),
         geometry=Frustum(
             bottom_radius=0.15,
             top_radius=0.15,
@@ -106,7 +111,7 @@ def build_glados() -> Node:
     )
     torso_connector_cylinder = Node(
         "torso_connector_cylinder",
-        Mat4.from_translation(Vec3(0,0.15,0.14)),
+        Mat4.from_translation(Vec3(0, 0.15, 0.14)),
         geometry=Frustum(
             bottom_radius=0.3,
             top_radius=0.3,
@@ -133,9 +138,9 @@ def build_glados() -> Node:
             color=COLOR_GREY,
         ),
     )
-    torso_core1_cylinder = Node (
+    torso_core1_cylinder = Node(
         "torso_core1_cylinder",
-        Mat4.from_translation(Vec3(0.1,0,0.98)),
+        Mat4.from_translation(Vec3(0.1, 0, 0.98)),
         geometry=Frustum(
             bottom_radius=0.16,
             top_radius=0.16,
@@ -152,7 +157,7 @@ def build_glados() -> Node:
             inner_bottom_radius=0.79,
             inner_top_radius=0.79,
             height=0.7,
-            theta_range=(90,289),
+            theta_range=(90, 289),
             color=COLOR_WHITE,
         ),
     )
@@ -330,7 +335,9 @@ def build_glados() -> Node:
         "joint_neck",
         Mat4.from_rotation(math.radians(-90), Vec3(1, 0, 0))
         @ Mat4.from_translation(Vec3(0, -0.1, 0))
-        @ Mat4.from_rotation(math.radians(0), Vec3(0, 1, 0)),  # joint (neck rotate around body)
+        @ Mat4.from_rotation(
+            math.radians(0), Vec3(0, 1, 0)
+        ),  # joint (neck rotate around body)
         geometry=Frustum(
             bottom_radius=0.46,
             top_radius=0.46,
@@ -431,10 +438,10 @@ def build_glados() -> Node:
     )
     head_base_bridge = Node(
         "head_base_bridge",
-        Mat4.from_rotation(math.radians(16), Vec3(0,0,1))
-        @ Mat4.from_translation(Vec3(0.39,-0.03,0)),
+        Mat4.from_rotation(math.radians(16), Vec3(0, 0, 1))
+        @ Mat4.from_translation(Vec3(0.39, -0.03, 0)),
         geometry=Cube(
-            size=(0.47,0.06,0.40),
+            size=(0.47, 0.06, 0.40),
             color=COLOR_WHITE,
         ),
     )
@@ -566,8 +573,8 @@ def build_glados() -> Node:
     )
     head_eye_base = Node(
         "head_eye_base",
-        Mat4.from_translation(Vec3(0,0.03,0))
-        @ Mat4.from_rotation(math.radians(65), Vec3(0,1,0)),
+        Mat4.from_translation(Vec3(0, 0.03, 0))
+        @ Mat4.from_rotation(math.radians(65), Vec3(0, 1, 0)),
         geometry=Frustum(
             bottom_radius=0.63,
             top_radius=0.63,
@@ -576,13 +583,15 @@ def build_glados() -> Node:
             height=0.30,
             theta_range=(-23, 23),
             caps=True,
-            color=(0,0,0,255),
+            color=(0, 0, 0, 255),
         ),
     )
     head_eye_core = Node(
         "head_eye_core",
-        Mat4.from_rotation(math.radians(0), Vec3(0,1,0)) # joint (vertical)
-        @ Mat4.from_translation(Vec3(0.00,0.00,0)), # joint (eye pop, horizontal, none)
+        Mat4.from_rotation(math.radians(0), Vec3(0, 1, 0))  # joint (vertical)
+        @ Mat4.from_translation(
+            Vec3(0.00, 0.00, 0)
+        ),  # joint (eye pop, horizontal, none)
         geometry=Frustum(
             bottom_radius=0.64,
             top_radius=0.64,
@@ -596,17 +605,20 @@ def build_glados() -> Node:
     )
     head_eye_iris = Node(
         "head_eye_iris",
-        Mat4.from_rotation(math.radians(90), Vec3(0,0,1))
-        @ Mat4.from_rotation(math.radians(0), Vec3(1,0,0)) # joint (vertical)
-        @ Mat4.from_translation(Vec3(0.00,0,0)) # joint (horizontal, none, none)
-        @ Mat4.from_translation(Vec3(0,-0.62,0)),
+        Mat4.from_rotation(math.radians(90), Vec3(0, 0, 1))
+        @ Mat4.from_rotation(math.radians(0), Vec3(1, 0, 0))  # joint (vertical)
+        @ Mat4.from_translation(Vec3(0.00, 0, 0))  # joint (horizontal, none, none)
+        @ Mat4.from_translation(Vec3(0, -0.62, 0)),
         geometry=Frustum(
-            bottom_radius=0.08, top_radius=0.08,
-            height=0.05, color=(242,255,97,255),
+            bottom_radius=0.08,
+            top_radius=0.08,
+            height=0.05,
+            color=(242, 255, 97, 255),
         ),
     )
 
-    ceil_base.add_child(ceil_drum)
+    ceil_base.add_child(joint_ceil_disc)
+    joint_ceil_disc.add_child(ceil_drum)
     ceil_drum.add_child(ceil_drum_fill)
     ceil_drum.add_child(joint_torso)
     joint_torso.add_child(torso_arm_center_left)
