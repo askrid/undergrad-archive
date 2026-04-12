@@ -16,9 +16,11 @@ import math
 from pyglet.math import Mat4, Vec3
 
 from primitives import Ellipsoid, Torus, Frustum, Cube, Color
-from scene import Node
+from scene import Node, Joint, FixedStep, RotStep, TransStep
+from animate import Keyframe, Timeline
 
 COLOR_GREY: Color = (50, 50, 50, 255)
+COLOR_LITEGREY: Color = (80, 80, 80, 255)
 COLOR_WHITE: Color = (240, 240, 240, 255)
 
 
@@ -26,16 +28,22 @@ def build_glados() -> Node:
     """
     Build a GLaDOS model.
     """
-    ceil_base = Node("ceil_base", Mat4.from_translation(Vec3(0, 7, 0)))
-    joint_ceil_disc = Node(
+    ceil_base = Node("ceil_base", Mat4.from_translation(Vec3(0, 9, 0)))
+    joint_ceil_disc = Joint(
         "ceil_disc",
-        Mat4.from_rotation(math.radians(0), Vec3(0, 1, 0)), # joint
-        geometry=Frustum(bottom_radius=1.5, top_radius=1.5, height=0.1, color=COLOR_GREY),
+        steps=[RotStep(Vec3(0, -1, 0), 0)],
+        rest_params=[0.0],
+        geometry=Frustum(
+            bottom_radius=1.5, top_radius=1.5, height=0.1, color=COLOR_GREY
+        ),
     )
-    ceil_drum = Node(
+    ceil_drum = Joint(
         "ceil_drum",
-        Mat4.from_translation(Vec3(0, -0.6, 0))
-        @ Mat4.from_rotation(math.radians(90), Vec3(0, 0, 1)),
+        steps=[
+            TransStep(0),
+            FixedStep(Mat4.from_rotation(math.radians(90), Vec3(0, 0, 1))),
+        ],
+        rest_params=[0.0, -0.6, 0.0],
         geometry=Frustum(
             bottom_radius=0.5,
             top_radius=0.5,
@@ -51,13 +59,15 @@ def build_glados() -> Node:
         geometry=Cube(size=(0.6, 1.2, 0.4), color=COLOR_GREY),
     )
 
-    joint_torso = Node(
+    joint_torso = Joint(
         "joint_torso",
-        Mat4.from_rotation(math.radians(-40), Vec3(0, 1, 0)),  # joint
+        steps=[RotStep(Vec3(0, 1, 0), 0)],
+        rest_params=[math.radians(-40)],
         geometry=Frustum(
             bottom_radius=0.08,
             top_radius=0.08,
             height=1.3,
+            color=COLOR_GREY,
         ),
     )
     torso_arm_center_left = Node(
@@ -106,7 +116,7 @@ def build_glados() -> Node:
             top_radius=0.55,
             height=0.3,
             theta_range=(-220, 40),
-            color=COLOR_WHITE,
+            color=COLOR_LITEGREY,
         ),
     )
     torso_connector_cylinder = Node(
@@ -122,7 +132,7 @@ def build_glados() -> Node:
     torso_connector_fill = Node(
         "torso_connector_fill",
         Mat4.from_translation(Vec3(0, 0, -0.16)),
-        geometry=Cube(size=(0.83, 0.3, 0.4), color=COLOR_WHITE),
+        geometry=Cube(size=(0.83, 0.3, 0.4), color=COLOR_LITEGREY),
     )
     torso_core1 = Node(
         "torso_core1",
@@ -145,7 +155,7 @@ def build_glados() -> Node:
             bottom_radius=0.16,
             top_radius=0.16,
             height=1.2,
-            color=COLOR_WHITE,
+            color=COLOR_GREY,
         ),
     )
     torso_core1_inner_cover = Node(
@@ -171,7 +181,7 @@ def build_glados() -> Node:
             inner_top_radius=1.1,
             height=0.4,
             theta_range=(100, 290),
-            color=COLOR_WHITE,
+            color=COLOR_LITEGREY,
         ),
     )
     torso_cover1 = Node(
@@ -197,26 +207,35 @@ def build_glados() -> Node:
             color=COLOR_WHITE,
         ),
     )
-    joint_chest1 = Node(
+    joint_chest1 = Joint(
         "joint_chest1",
-        Mat4.from_translation(Vec3(-0.12, 0, -1.35))
-        @ Mat4.from_rotation(math.radians(0), Vec3(0, 1, 0)),  # joint
-        geometry=Frustum(bottom_radius=0.1, top_radius=0.1, height=0.3),
+        steps=[
+            FixedStep(Mat4.from_translation(Vec3(-0.12, 0, -1.35))),
+            RotStep(Vec3(0, -1, 0), 0),
+        ],
+        rest_params=[0.0],
+        geometry=Frustum(bottom_radius=0.1, top_radius=0.1, height=0.3, color=COLOR_GREY),
     )
     chest_joint_connector = Node(
         "chest_joint_connector",
         Mat4.from_translation(Vec3(0, 0, -0.15)),
         geometry=Cube(
             size=(0.15, 0.12, 0.25),
+            color=COLOR_GREY,
         ),
     )
-    joint_chest2 = Node(
+    joint_chest2 = Joint(
         "joint_chest2",
-        Mat4.from_translation(Vec3(-0.06, 0, -0.20))
-        @ Mat4.from_rotation(math.radians(90), Vec3(1, 0, 0))
-        @ Mat4.from_rotation(math.radians(-30), Vec3(0, 0, 1))
-        @ Mat4.from_rotation(math.radians(0), Vec3(0, 1, 0)),  # joint
-        geometry=Frustum(bottom_radius=0.05, top_radius=0.05, height=0.3),
+        steps=[
+            FixedStep(
+                Mat4.from_translation(Vec3(-0.06, 0, -0.20))
+                @ Mat4.from_rotation(math.radians(90), Vec3(1, 0, 0))
+                @ Mat4.from_rotation(math.radians(-30), Vec3(0, 0, 1))
+            ),
+            RotStep(Vec3(0, -1, 0), 0),
+        ],
+        rest_params=[0.0],
+        geometry=Frustum(bottom_radius=0.05, top_radius=0.05, height=0.3, color=COLOR_GREY),
     )
     chest_connector = Node(
         "chest_connector",
@@ -329,15 +348,19 @@ def build_glados() -> Node:
         @ Mat4.from_translation(Vec3(0.85, 0, -0.7)),
         geometry=Cube(
             size=(0.45, 0.45, 0.4),
+            color=COLOR_GREY,
         ),
     )
-    joint_neck = Node(
+    joint_neck = Joint(
         "joint_neck",
-        Mat4.from_rotation(math.radians(-90), Vec3(1, 0, 0))
-        @ Mat4.from_translation(Vec3(0, -0.1, 0))
-        @ Mat4.from_rotation(
-            math.radians(0), Vec3(0, 1, 0)
-        ),  # joint (neck rotate around body)
+        steps=[
+            FixedStep(
+                Mat4.from_rotation(math.radians(-90), Vec3(1, 0, 0))
+                @ Mat4.from_translation(Vec3(0, -0.1, 0))
+            ),
+            RotStep(Vec3(0, -1, 0), 0),
+        ],
+        rest_params=[0.0],
         geometry=Frustum(
             bottom_radius=0.46,
             top_radius=0.46,
@@ -353,6 +376,7 @@ def build_glados() -> Node:
         @ Mat4.from_rotation(math.radians(-70), Vec3(0, 0, 1)),
         geometry=Cube(
             size=(0.4, 0.1, 0.6),
+            color=COLOR_GREY,
         ),
     )
     neck_case_bottom = Node(
@@ -360,6 +384,7 @@ def build_glados() -> Node:
         Mat4.from_translation(Vec3(0.16, -0.13, 0)),
         geometry=Cube(
             size=(0.06, 0.4, 0.9),
+            color=COLOR_GREY,
         ),
     )
     neck_case_left = Node(
@@ -367,6 +392,7 @@ def build_glados() -> Node:
         Mat4.from_translation(Vec3(-0.06, -0.13, -0.43)),
         geometry=Cube(
             size=(0.5, 0.4, 0.07),
+            color=COLOR_GREY,
         ),
     )
     neck_case_right = Node(
@@ -374,6 +400,7 @@ def build_glados() -> Node:
         Mat4.from_translation(Vec3(-0.06, -0.13, 0.43)),
         geometry=Cube(
             size=(0.5, 0.4, 0.07),
+            color=COLOR_GREY,
         ),
     )
     neck_cover_left = Node(
@@ -409,7 +436,7 @@ def build_glados() -> Node:
             bottom_radius=0.17,
             top_radius=0.17,
             height=0.12,
-            color=COLOR_WHITE,
+            color=COLOR_GREY,
         ),
     )
     neck_pillar = Node(
@@ -417,16 +444,21 @@ def build_glados() -> Node:
         Mat4.from_translation(Vec3(0, 0.3, 0)),
         geometry=Cube(
             size=(0.10, 0.6, 0.2),
+            color=COLOR_GREY,
         ),
     )
-    joint_head = Node(
+    joint_head = Joint(
         "joint_head",
-        Mat4.from_translation(Vec3(0, 0.35, 0))
-        @ Mat4.from_rotation(math.radians(-40), Vec3(1, 0, 0))  # joint
-        @ Mat4.from_rotation(math.radians(25), Vec3(0, 0, 1))  # joint
-        @ Mat4.from_rotation(math.radians(0), Vec3(0, 1, 0)),  # joint
+        steps=[
+            FixedStep(Mat4.from_translation(Vec3(0, 0.35, 0))),
+            RotStep(Vec3(1, 0, 0), 0),
+            RotStep(Vec3(0, 0, 1), 1),
+            RotStep(Vec3(0, 1, 0), 2),
+        ],
+        rest_params=[math.radians(0), math.radians(0), math.radians(0)],
         geometry=Ellipsoid(
             radius=(0.1, 0.1, 0.1),
+            color=COLOR_GREY,
         ),
     )
     head_base = Node(
@@ -586,12 +618,13 @@ def build_glados() -> Node:
             color=(0, 0, 0, 255),
         ),
     )
-    head_eye_core = Node(
+    head_eye_core = Joint(
         "head_eye_core",
-        Mat4.from_rotation(math.radians(0), Vec3(0, 1, 0))  # joint (vertical)
-        @ Mat4.from_translation(
-            Vec3(0.00, 0.00, 0)
-        ),  # joint (eye pop, horizontal, none)
+        steps=[
+            RotStep(Vec3(0, 1, 0), 0),  # param[0]: vertical aim
+            TransStep(1),  # params[1,2,3]: (eye_pop, horizontal, _)
+        ],
+        rest_params=[0.0, 0.0, 0.0, 0.0],
         geometry=Frustum(
             bottom_radius=0.64,
             top_radius=0.64,
@@ -603,12 +636,15 @@ def build_glados() -> Node:
             color=COLOR_GREY,
         ),
     )
-    head_eye_iris = Node(
+    head_eye_iris = Joint(
         "head_eye_iris",
-        Mat4.from_rotation(math.radians(90), Vec3(0, 0, 1))
-        @ Mat4.from_rotation(math.radians(0), Vec3(1, 0, 0))  # joint (vertical)
-        @ Mat4.from_translation(Vec3(0.00, 0, 0))  # joint (horizontal, none, none)
-        @ Mat4.from_translation(Vec3(0, -0.62, 0)),
+        steps=[
+            FixedStep(Mat4.from_rotation(math.radians(90), Vec3(0, 0, 1))),
+            RotStep(Vec3(1, 0, 0), 0),  # param[0]: vertical aim
+            TransStep(1),  # params[1,2,3]: (horizontal, _, _)
+            FixedStep(Mat4.from_translation(Vec3(0, -0.62, 0))),
+        ],
+        rest_params=[0.0, 0.0, 0.0, 0.0],
         geometry=Frustum(
             bottom_radius=0.08,
             top_radius=0.08,
@@ -678,3 +714,60 @@ def build_glados() -> Node:
     head_eye_core.add_child(head_eye_iris)
 
     return ceil_base
+
+
+def build_glados_wakeup() -> tuple[Timeline, Timeline]:
+    return Timeline(
+        duration=60,
+        keyframes=[
+            Keyframe(0.0, {"ceil_disc":[-0.2618],"ceil_drum":[0.0000,-5.1000,0.0000],"joint_torso":[-1.3090],"joint_chest1":[0.7854],"joint_chest2":[0.5236],"joint_neck":[-0.6981],"joint_head":[-0.1745,0.2618,1.1345],"head_eye_core":[0.0000,0.0000,0.0000,0.0000],"head_eye_iris":[0.0000,0.0000,0.0000,0.0000]}),
+            Keyframe(6.0, {"ceil_disc":[2.7925],"ceil_drum":[0.0000,-1.5000,0.0000],"joint_torso":[-0.6981],"joint_chest1":[0.1745],"joint_chest2":[-0.2618],"joint_neck":[-0.0872],"joint_head":[0.0000,-1.0472,0.0000],"head_eye_core":[0.0000,0.0000,0.0000,0.0000],"head_eye_iris":[0.0000,0.0000,0.0000,0.0000]}),
+            Keyframe(9.0, {"ceil_disc":[2.2689],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.2618],"joint_chest1":[-1.8327],"joint_chest2":[-0.6109],"joint_neck":[0.3491],"joint_head":[0.0873,-0.9599,-0.0873],"head_eye_core":[0.0873,0.0000,0.0000,0.0000],"head_eye_iris":[0.0000,0.0000,0.0000,0.0000]}),
+            Keyframe(10.5, {"ceil_disc":[1.3090],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.8727],"joint_chest1":[0.2617],"joint_chest2":[-0.3491],"joint_neck":[0.1746],"joint_head":[0.0000,0.2618,-0.3491],"head_eye_core":[0.0000,0.0000,0.0000,0.0500],"head_eye_iris":[0.0000,0.0000,0.0000,0.1000]}),
+            Keyframe(12, {"ceil_disc":[1.3090],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.7854],"joint_chest1":[-0.5237],"joint_chest2":[-0.4364],"joint_neck":[-0.3490],"joint_head":[0.6109,-0.2618,0.4363],"head_eye_core":[0.1745,0.0000,0.0000,0.0500],"head_eye_iris":[0.2618,0.0000,0.0000,0.1000]}),
+            Keyframe(14, {"ceil_disc":[-0.5236],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6981],"joint_chest1":[-0.3492],"joint_chest2":[0.0872],"joint_neck":[0.0001],"joint_head":[0.0000,0.8727,1.5708],"head_eye_core":[0.1745,0.0000,0.0000,0.0500],"head_eye_iris":[0.2618,0.0000,0.0000,0.1000]}),
+            Keyframe(15.5, {"ceil_disc":[-0.6109],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.7854],"joint_chest1":[-0.0874],"joint_chest2":[0.0872],"joint_neck":[0.0001],"joint_head":[-0.5236,-0.8726,-0.1745],"head_eye_core":[0.1745,0.0000,0.0000,0.0500],"head_eye_iris":[0.2618,0.0000,0.0000,0.1000]}),
+            Keyframe(17.0, {"ceil_disc":[-0.4364],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.7854],"joint_chest1":[-0.3492],"joint_chest2":[0.2617],"joint_neck":[-0.0872],"joint_head":[0.0873,-0.2617,-0.3490],"head_eye_core":[0.0872,0.0000,0.0000,0.0500],"head_eye_iris":[0.0000,0.0000,0.0000,0.1000]}),
+            Keyframe(18.0, {"ceil_disc":[-0.5237],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6109],"joint_chest1":[-0.2619],"joint_chest2":[-0.2619],"joint_neck":[0.1746],"joint_head":[-1.0472,-0.6108,0.6982],"head_eye_core":[0.0872,0.0000,0.0000,0.0500],"head_eye_iris":[0.0000,0.0000,0.0000,0.1000]}),
+            Keyframe(19.0, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[-0.0873],"joint_chest2":[-0.1746],"joint_neck":[-0.1745],"joint_head":[-0.3491,0.6110,0.0873],"head_eye_core":[-0.0000,0.0000,0.0000,0.0500],"head_eye_iris":[0.2618,0.0000,0.0000,0.1000]}),
+            Keyframe(20.0, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[-0.0000],"joint_chest2":[-0.1746],"joint_neck":[-0.1745],"joint_head":[-0.3491,0.8728,0.0873],"head_eye_core":[0.0873,0.0000,0.0000,0.0500],"head_eye_iris":[0.2618,0.0000,0.0000,0.1000]}),
+            Keyframe(21.6, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[-0.0000],"joint_chest2":[-0.1746],"joint_neck":[-0.1745],"joint_head":[-0.3491,0.6983,0.1746],"head_eye_core":[0.0000,0.0000,0.0000,0.0500],"head_eye_iris":[0.0873,-0.0500,0.0000,0.1000]}),
+            Keyframe(25.5, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[-0.0000],"joint_chest2":[-0.1746],"joint_neck":[-0.1745],"joint_head":[-0.4364,0.6110,0.0001],"head_eye_core":[0.0873,0.0000,0.0000,0.0500],"head_eye_iris":[0.0873,0.0000,0.0000,0.1000]}),
+            Keyframe(27.5, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[-0.0000],"joint_chest2":[-0.1746],"joint_neck":[-0.1745],"joint_head":[-0.6109,0.6983,-0.2617],"head_eye_core":[0.0873,0.0000,0.0000,0.0500],"head_eye_iris":[0.0873,0.0000,0.0000,0.1000]}),
+            Keyframe(29.0, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[-0.0000],"joint_chest2":[-0.1746],"joint_neck":[-0.1745],"joint_head":[-0.4364,1.1346,-0.3490],"head_eye_core":[0.1746,0.0000,0.0000,0.0500],"head_eye_iris":[0.2618,0.0000,0.0000,0.1000]}),
+            Keyframe(30.5, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[-0.0000],"joint_chest2":[-0.1746],"joint_neck":[-0.1745],"joint_head":[-0.0001,0.5237,0.0873],"head_eye_core":[0.1746,0.0000,0.0000,0.0500],"head_eye_iris":[0.2618,0.0000,0.0000,0.1000]}),
+            Keyframe(30.85, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.0000],"joint_chest2":[-0.1746],"joint_neck":[-0.1745],"joint_head":[-0.0001,0.5237,0.0873],"head_eye_core":[0.1746,0.0500,0.0000,0.0500],"head_eye_iris":[0.2618,0.0000,-0.0500,0.1000]}),
+            Keyframe(31.2, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[-0.0000],"joint_chest2":[-0.1746],"joint_neck":[-0.1745],"joint_head":[-0.0001,0.5237,0.0873],"head_eye_core":[0.1746,0.0000,0.0000,0.0500],"head_eye_iris":[0.2618,0.0000,0.0000,0.1000]}),
+            Keyframe(31.6, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[-0.0000],"joint_chest2":[-0.1746],"joint_neck":[-0.1745],"joint_head":[-0.6110,0.5237,-0.0872],"head_eye_core":[0.0873,0.0000,0.0000,0.0500],"head_eye_iris":[0.1745,0.0000,-0.0500,0.1000]}),
+            Keyframe(32.0, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[-0.0000],"joint_chest2":[-0.1746],"joint_neck":[-0.1745],"joint_head":[-0.6110,0.5237,-0.0872],"head_eye_core":[0.0873,0.0000,0.0000,0.0500],"head_eye_iris":[0.1745,0.0000,0.0000,0.1000]}),
+            Keyframe(33.4, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[-0.0000],"joint_chest2":[-0.1746],"joint_neck":[-0.1745],"joint_head":[-0.6110,0.5237,-0.0872],"head_eye_core":[0.0873,0.0000,0.0000,0.0500],"head_eye_iris":[0.1745,0.0000,0.0000,0.1000]}),
+            Keyframe(34.5, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.1745],"joint_chest2":[0.0872],"joint_neck":[0.0000],"joint_head":[-0.5237,0.6982,-0.1745],"head_eye_core":[0.1746,0.0000,0.0000,0.0500],"head_eye_iris":[0.2618,0.0000,0.0000,0.1000]}),
+            Keyframe(35.3, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.1745],"joint_chest2":[0.0872],"joint_neck":[0.0000],"joint_head":[-0.5237,0.6982,-0.1745],"head_eye_core":[0.1746,0.0000,0.0000,0.0500],"head_eye_iris":[0.2618,0.0000,0.0000,0.1000]}),
+            Keyframe(37.1, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.0872],"joint_chest2":[0.0872],"joint_neck":[-0.1745],"joint_head":[-0.9600,0.4364,0.0000],"head_eye_core":[0.0873,0.0000,0.0000,0.0500],"head_eye_iris":[0.1745,0.0000,0.0000,0.1000]}),
+            Keyframe(38.2, {"ceil_disc":[-0.0001],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.0872],"joint_chest2":[0.0872],"joint_neck":[-0.1745],"joint_head":[-0.9600,0.4364,0.0000],"head_eye_core":[0.0873,0.0000,0.0000,0.0500],"head_eye_iris":[0.1745,0.0000,0.0000,0.1000]}),
+            Keyframe(41.52, {"ceil_disc":[-0.0873],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.0872],"joint_chest2":[-0.0001],"joint_neck":[-0.1745],"joint_head":[-0.9600,-0.2617,0.0873],"head_eye_core":[0.0873,0.0000,0.0000,0.0500],"head_eye_iris":[0.0872,0.0000,0.0000,0.1000]}),
+            Keyframe(42.32, {"ceil_disc":[-0.0873],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.0872],"joint_chest2":[-0.0001],"joint_neck":[-0.1745],"joint_head":[-1.3091,0.3492,-0.5236],"head_eye_core":[0.1746,0.0000,0.0000,0.0500],"head_eye_iris":[0.0872,0.0000,0.0000,0.1000]}, easing="ease_out"),
+            Keyframe(44.55, {"ceil_disc":[-0.0873],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.0872],"joint_chest2":[-0.0001],"joint_neck":[-0.1745],"joint_head":[-1.3091,0.3492,-0.5236],"head_eye_core":[0.1746,0.0000,0.0000,0.0500],"head_eye_iris":[0.0872,0.0000,0.0000,0.1000]}, easing="ease_in"),
+            Keyframe(44.80, {"ceil_disc":[-0.0873],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.0872],"joint_chest2":[-0.0001],"joint_neck":[-0.1745],"joint_head":[-1.2218,0.5237,-0.5236],"head_eye_core":[0.1746,0.0000,0.0000,0.0500],"head_eye_iris":[0.0872,0.0000,0.0000,0.1000]}),
+            Keyframe(45.1, {"ceil_disc":[-0.0873],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.0872],"joint_chest2":[-0.0001],"joint_neck":[-0.1745],"joint_head":[-1.3091,0.3492,-0.5236],"head_eye_core":[0.1746,0.0000,0.0000,0.0500],"head_eye_iris":[0.0872,0.0000,0.0000,0.1000]}),
+            Keyframe(46.6, {"ceil_disc":[-0.0873],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.0872],"joint_chest2":[-0.0001],"joint_neck":[-0.1745],"joint_head":[-1.3091,0.3492,-0.5236],"head_eye_core":[0.1746,0.0000,0.0000,0.0500],"head_eye_iris":[0.0872,0.0000,0.0000,0.1000]}),
+            Keyframe(47.6, {"ceil_disc":[-0.0873],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.0872],"joint_chest2":[-0.0001],"joint_neck":[-0.1745],"joint_head":[-1.3964,0.0874,-0.5236],"head_eye_core":[0.0873,0.0000,0.0000,0.0500],"head_eye_iris":[-0.0001,0.0000,0.0000,0.1000]}),
+            Keyframe(49.5, {"ceil_disc":[-0.0873],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.0872],"joint_chest2":[-0.0001],"joint_neck":[-0.1745],"joint_head":[-1.3964,0.0874,-0.5236],"head_eye_core":[0.0873,0.0000,0.0000,0.0500],"head_eye_iris":[-0.0001,0.0000,0.0000,0.1000]}),
+            Keyframe(51.88, {"ceil_disc":[-0.7766],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.0872],"joint_chest2":[-0.0001],"joint_neck":[-0.1215],"joint_head":[-0.7601,0.4056,-0.2850],"head_eye_core":[0.0608,0.0000,0.0000,0.0500],"head_eye_iris":[-0.0001,0.0000,0.0000,0.1000]}, easing="linear"),
+            Keyframe(52.13, {"ceil_disc":[-0.9012],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.0872],"joint_chest2":[-0.0001],"joint_neck":[-0.1119],"joint_head":[-0.6451,0.4630,-0.2419],"head_eye_core":[0.1433,0.0000,0.0000,0.0500],"head_eye_iris":[0.2617,0.0000,0.0000,0.1000]}, easing="linear"),
+            Keyframe(56.0, {"ceil_disc":[-2.3562],"ceil_drum":[0.0000,-0.6000,0.0000],"joint_torso":[-0.6982],"joint_chest1":[0.0872],"joint_chest2":[-0.0001],"joint_neck":[0.0000],"joint_head":[0.6980,1.1346,0.2618],"head_eye_core":[0.0873,0.0000,0.0000,0.0500],"head_eye_iris":[0.2617,0.0000,0.0000,0.1000]}, easing="linear"),
+        ],
+    ), Timeline(
+        duration=60,
+        keyframes=[
+            Keyframe(0.0, {"_cam_eye": [1.8, 0.5, 1.8], "_cam_target": [0,0.5,0]}),
+            Keyframe(20.0, {"_cam_eye": [2.8, 2, 2.8], "_cam_target": [0,3.0,0]}),
+            Keyframe(37.1, {"_cam_eye": [2.8, 2, 2.8], "_cam_target": [0,3.0,0]}),
+            Keyframe(42.2, {"_cam_eye": [3.0, 3, 2.0], "_cam_target": [0,3.0,1.0]}),
+            Keyframe(49.5, {"_cam_eye": [3.0, 3, 2.0], "_cam_target": [0,3.0,1.0]}),
+            Keyframe(52.13, {"_cam_eye": [3.8, 3, 1.2], "_cam_target": [0,3.0,0.7]}, easing="ease_in"),
+            Keyframe(56.0, {"_cam_eye": [3.6, 4, -1.5], "_cam_target": [0,3.0,0]}),
+            Keyframe(60.0, {"_cam_eye": [3.5, 4, -2.0], "_cam_target": [5,3.0,-5]}),
+        ]
+    )
+

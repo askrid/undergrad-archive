@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import os
+import subprocess
 import sys
 from typing import TYPE_CHECKING
 
@@ -9,13 +10,15 @@ import pyglet
 from pyglet.window import key, mouse
 from pyglet.math import Vec3
 
+from scene import Joint, RotStep, TransStep
+
 if TYPE_CHECKING:
     from render import RenderWindow
 
 
 class Control:
     """
-    Fly-camera controls for the RenderWindow.
+    Camera controls
 
       W / S           move forward / backward (along the current look direction)
       A / D           strafe left / right     (horizontal, ignores pitch)
@@ -25,16 +28,25 @@ class Control:
       R               reset camera to its starting pose
       G               toggle per-node debug axes (gizmos) on the scene
       Z               restart the whole program (picks up model edits)
-      SPACE           toggle the existing animate flag
       ESC             quit
 
-    The window exposes ``cam_eye`` / ``cam_target`` / ``cam_vup``; RenderWindow.update()
-    rebuilds the view matrix from these each frame, so we just mutate them here.
+    Joint poser:
+      1-9             select joint (by index in the collected list)
+      j / k           cycle param within selected joint (down / up)
+      h / l           decrement / increment active param
+      P               print all joint params (copy-pasteable for keyframes)
+      [ / ]           scrub to prev / next keyframe
+      SPACE           toggle animation playback
     """
 
     MOVE_SPEED: float = 5.0  # world units per second
     MOUSE_SENS: float = 0.005  # radians per pixel of mouse motion
     SCROLL_STEP: float = 0.5  # world units per scroll tick
+
+    ROT_STEP: float = math.radians(5)  # 5° per press
+    ROT_STEP_BIG: float = math.radians(30)  # 30° with shift
+    TRANS_STEP: float = 0.05  # world units per press
+    TRANS_STEP_BIG: float = 0.3  # with shift
 
     window: "RenderWindow"
     keys_held: set[int]
@@ -43,6 +55,11 @@ class Control:
     _home_eye: Vec3
     _home_yaw: float
     _home_pitch: float
+
+    # Joint poser state
+    _joint_list: list[Joint]
+    _joint_idx: int
+    _param_idx: int
 
     def __init__(self, window: "RenderWindow") -> None:
         window.on_key_press = self.on_key_press
@@ -57,6 +74,10 @@ class Control:
         self.keys_held = set()
         self.yaw = 0.0  # radians; 0 means looking down -Z
         self.pitch = 0.0  # radians; positive looks up
+
+        self._joint_list = []
+        self._joint_idx = 0
+        self._param_idx = 0
 
         self.setup()
 
@@ -96,6 +117,69 @@ class Control:
 
     def _sync_target(self) -> None:
         self.window.cam_target = self.window.cam_eye + self._forward()
+
+    # --- joint poser -------------------------------------------------------
+
+    def _ensure_joints(self) -> None:
+        """Lazily collect Joint nodes from the scene graph."""
+        if self._joint_list:
+            return
+        from animate import _collect_joints
+
+        if self.window.scene is None:
+            return
+        joints: dict[str, Joint] = {}
+        _collect_joints(self.window.scene.root, joints)
+        self._joint_list = list(joints.values())
+
+    def _active_joint(self) -> Joint | None:
+        self._ensure_joints()
+        if not self._joint_list:
+            return None
+        return self._joint_list[self._joint_idx % len(self._joint_list)]
+
+    def _step_for_param(self, joint: Joint, param_idx: int, big: bool = False) -> float:
+        """Return the increment size for the given param index."""
+        for step in joint.steps:
+            if isinstance(step, RotStep) and step.index == param_idx:
+                return self.ROT_STEP_BIG if big else self.ROT_STEP
+            elif isinstance(step, TransStep) and step.index <= param_idx < step.index + 3:
+                return self.TRANS_STEP_BIG if big else self.TRANS_STEP
+        return self.ROT_STEP_BIG if big else self.ROT_STEP
+
+    def _print_joints(self) -> None:
+        """Print all joint params and pipe dict to wl-copy."""
+        self._ensure_joints()
+        lines = []
+        for j in self._joint_list:
+            vals = ",".join(f"{v:.4f}" for v in j.params)
+            lines.append(f'"{j.name}":[{vals}]')
+        clip = "{" + ",".join(lines) + "}"
+        print(clip)
+        try:
+            subprocess.Popen(
+                ["wl-copy"], stdin=subprocess.PIPE
+            ).communicate(clip.encode())
+        except FileNotFoundError:
+            pass
+
+    def _show_poser_status(self) -> None:
+        j = self._active_joint()
+        if j is None:
+            return
+        idx = self._param_idx % len(j.params)
+        # Determine param label
+        label = f"p[{idx}]"
+        for step in j.steps:
+            if isinstance(step, RotStep) and step.index == idx:
+                label = f"rot({step.axis}) [{idx}]"
+                break
+            elif isinstance(step, TransStep) and step.index <= idx < step.index + 3:
+                comp = ["x", "y", "z"][idx - step.index]
+                label = f"trans.{comp} [{idx}]"
+                break
+        val = j.params[idx]
+        print(f"[poser] {j.name}  {label} = {val:.4f}  (deg={math.degrees(val):.1f})")
 
     # --- per-frame tick ----------------------------------------------------
 
@@ -137,6 +221,12 @@ class Control:
             pyglet.app.exit()
         elif symbol == key.SPACE:
             self.window.animate = not self.window.animate
+            if self.window.player is not None:
+                if self.window.animate:
+                    self.window.player.play_audio()
+                else:
+                    self.window.player.pause_audio()
+                    print(f"[pause] t={self.window.player.elapsed:.2f}s")
         elif symbol == key.R:
             self.reset()
         elif symbol == key.G:
@@ -145,6 +235,50 @@ class Control:
         elif symbol == key.Z:
             pyglet.app.exit()
             os.execv(sys.executable, [sys.executable] + sys.argv)
+        # --- Joint poser (vim keys) ---
+        elif key._1 <= symbol <= key._9:
+            self._ensure_joints()
+            idx = symbol - key._1
+            if idx < len(self._joint_list):
+                self._joint_idx = idx
+                self._param_idx = 0
+                self._show_poser_status()
+        elif symbol == key.J:
+            j = self._active_joint()
+            if j is not None:
+                self._param_idx = (self._param_idx + 1) % len(j.params)
+                self._show_poser_status()
+        elif symbol == key.K:
+            j = self._active_joint()
+            if j is not None:
+                self._param_idx = (self._param_idx - 1) % len(j.params)
+                self._show_poser_status()
+        elif symbol == key.H:
+            j = self._active_joint()
+            if j is not None:
+                idx = self._param_idx % len(j.params)
+                big = bool(modifiers & key.MOD_SHIFT)
+                j.params[idx] -= self._step_for_param(j, idx, big)
+                self._show_poser_status()
+        elif symbol == key.L:
+            j = self._active_joint()
+            if j is not None:
+                idx = self._param_idx % len(j.params)
+                big = bool(modifiers & key.MOD_SHIFT)
+                j.params[idx] += self._step_for_param(j, idx, big)
+                self._show_poser_status()
+        elif symbol == key.P:
+            self._print_joints()
+        elif symbol == key.BRACKETLEFT:
+            if self.window.player is not None:
+                self.window.animate = False
+                self.window.player.seek_keyframe(-1)
+                print(f"[scrub] t={self.window.player.elapsed:.2f}s")
+        elif symbol == key.BRACKETRIGHT:
+            if self.window.player is not None:
+                self.window.animate = False
+                self.window.player.seek_keyframe(1)
+                print(f"[scrub] t={self.window.player.elapsed:.2f}s")
 
     def on_mouse_motion(self, x: int, y: int, dx: int, dy: int) -> None:
         pass

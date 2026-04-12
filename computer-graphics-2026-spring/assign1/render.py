@@ -11,6 +11,7 @@ from primitives import CustomGroup
 
 if TYPE_CHECKING:
     from scene import Scene
+    from animate import AnimationPlayer
 
 
 class RenderWindow(pyglet.window.Window):
@@ -29,6 +30,7 @@ class RenderWindow(pyglet.window.Window):
     proj_mat: Mat4
     shapes: list[CustomGroup]
     scene: "Scene | None"
+    player: "AnimationPlayer | None"
     animate: bool
 
     # Lighting (fixed point light, world space). Single hardcoded light --
@@ -52,8 +54,8 @@ class RenderWindow(pyglet.window.Window):
         """
         View (camera) parameters
         """
-        self.cam_eye = Vec3(4, 1.5, 2)
-        self.cam_target = Vec3(0, 1.5, 2)
+        self.cam_eye = Vec3(2.5, 2.0, 2.5)
+        self.cam_target = Vec3(0, 2, 0)
         self.cam_vup = Vec3(0, 1, 0)
         self.view_mat = Mat4()
         """
@@ -61,7 +63,7 @@ class RenderWindow(pyglet.window.Window):
         """
         self.z_near = 0.1
         self.z_far = 100
-        self.fov = 70
+        self.fov = 80
         self.proj_mat = Mat4()
 
         # Lighting parameters (fixed point light in world space).
@@ -74,6 +76,7 @@ class RenderWindow(pyglet.window.Window):
 
         self.shapes = []
         self.scene = None
+        self.player = None
         self.setup()
 
         self.animate = False
@@ -119,8 +122,12 @@ class RenderWindow(pyglet.window.Window):
         self.view_mat = Mat4.look_at(
             self.cam_eye, target=self.cam_target, up=self.cam_vup
         )
-        # Propagate hierarchical transforms for any scene-graph nodes. Any
-        # animation should live in the scene graph (mutate node.local_transform).
+        # Drive animation before propagating transforms.
+        if self.player is not None and self.animate:
+            self.player.update(dt)
+            if self.player.elapsed >= self.player.timeline.duration:
+                self.animate = False
+                self.player.stop_audio()
         if self.scene is not None:
             self.scene.update_world_transforms()
         view_proj = self.proj_mat @ self.view_mat

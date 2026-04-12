@@ -1,10 +1,41 @@
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import Optional, Union, TYPE_CHECKING
 
-from pyglet.math import Mat4
+from pyglet.math import Mat4, Vec3
 
 from primitives import Axes, Primitive, CustomGroup
+
+# ---------------------------------------------------------------------------
+# Joint step types — describe the interleaved fixed/animatable transforms
+# that compose a Joint's local_transform.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FixedStep:
+    """A constant Mat4 (translation, fixed rotation, etc.)."""
+
+    mat: Mat4
+
+
+@dataclass
+class RotStep:
+    """A rotation whose angle is params[index], around *axis*."""
+
+    axis: Vec3
+    index: int
+
+
+@dataclass
+class TransStep:
+    """A translation whose xyz come from params[index : index+3]."""
+
+    index: int
+
+
+Step = Union[FixedStep, RotStep, TransStep]
 
 if TYPE_CHECKING:
     from render import RenderWindow
@@ -31,7 +62,7 @@ class Node:
     """
 
     name: str
-    local_transform: Mat4
+    _local_transform: Mat4
     geometry: Optional[Primitive]
     parent: Optional["Node"]
     children: list["Node"]
@@ -46,7 +77,7 @@ class Node:
         geometry: Optional[Primitive] = None,
     ) -> None:
         self.name = name
-        self.local_transform = (
+        self._local_transform = (
             local_transform if local_transform is not None else Mat4()
         )
         self.geometry = geometry
@@ -58,10 +89,75 @@ class Node:
         # Optional debug gizmo (mini-axes) attached to this node's frame.
         self._debug_group = None
 
+    @property
+    def local_transform(self) -> Mat4:
+        return self._local_transform
+
+    @local_transform.setter
+    def local_transform(self, value: Mat4) -> None:
+        self._local_transform = value
+
     def add_child(self, node: "Node") -> "Node":
         node.parent = self
         self.children.append(node)
         return node
+
+
+class Joint(Node):
+    """
+    A Node whose local_transform is computed from an ordered list of *steps*.
+
+    Each step is either:
+      - FixedStep(mat)      — a constant Mat4
+      - RotStep(axis, idx)  — rotation by params[idx] radians around axis
+      - TransStep(idx)      — translation by Vec3(params[idx], params[idx+1], params[idx+2])
+
+    Steps are composed left-to-right, allowing fixed and animated transforms
+    to be freely interleaved (e.g. FIXED @ JOINT @ JOINT @ FIXED).
+    """
+
+    steps: list[Step]
+    params: list[float]
+    rest_params: list[float]
+
+    def __init__(
+        self,
+        name: str,
+        steps: list[Step],
+        rest_params: list[float],
+        geometry: Optional[Primitive] = None,
+    ) -> None:
+        # Compute the initial local_transform from rest params so Node.__init__
+        # sees the correct starting value for registration.
+        self.steps = steps
+        self.rest_params = list(rest_params)
+        self.params = list(rest_params)
+        super().__init__(name, self._compute_transform(), geometry)
+
+    def _compute_transform(self) -> Mat4:
+        m = Mat4()
+        for step in self.steps:
+            if isinstance(step, FixedStep):
+                m = m @ step.mat
+            elif isinstance(step, RotStep):
+                m = m @ Mat4.from_rotation(self.params[step.index], step.axis)
+            elif isinstance(step, TransStep):
+                i = step.index
+                m = m @ Mat4.from_translation(
+                    Vec3(self.params[i], self.params[i + 1], self.params[i + 2])
+                )
+        return m
+
+    @property
+    def local_transform(self) -> Mat4:
+        return self._compute_transform()
+
+    @local_transform.setter
+    def local_transform(self, value: Mat4) -> None:
+        pass  # params are the source of truth
+
+    def reset(self) -> None:
+        self.params = list(self.rest_params)
 
 
 class Scene:

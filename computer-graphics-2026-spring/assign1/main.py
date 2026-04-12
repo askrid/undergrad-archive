@@ -4,7 +4,8 @@ from render import RenderWindow
 from primitives import Axes
 from scene import Scene
 from control import Control
-from models import build_glados
+from models import build_glados, build_glados_wakeup
+from animate import AnimationPlayer
 
 if __name__ == "__main__":
     width = 1280
@@ -12,12 +13,9 @@ if __name__ == "__main__":
 
     renderer = RenderWindow(width, height, "Hello Pyglet", resizable=True)
     renderer.set_location(200, 200)
-
-    # WASD + mouse-drag camera controls (R reset, Z restart, G gizmos,
-    # ESC quit, SPACE animate).
     controller = Control(renderer)
 
-    # --- Reference axes (not part of the scene graph; they never move) ------
+    # --- Reference axes ---
     axes = Axes(length=5, tick=1, tick_size=0.08)
     renderer.add_shape(
         Mat4(),
@@ -29,9 +27,14 @@ if __name__ == "__main__":
         lit=axes.lit,
     )
 
-    # --- Scene: hierarchical models live in models.py -----------------------
+    # --- Scene ---
     scene = Scene(renderer)
     scene.root.add_child(build_glados())
     scene.register()
+
+    # --- Animation ---
+    model_timeline, cam_timeline = build_glados_wakeup()
+    player = AnimationPlayer(scene, model_timeline, cam_timeline=cam_timeline, audio_path="./audio/glados_wakes_up.mp3", audio_start=16.1)
+    renderer.player = player
 
     renderer.run()
