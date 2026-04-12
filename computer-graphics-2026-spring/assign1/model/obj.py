@@ -22,7 +22,7 @@ class Mesh:
 
 
 def load_material_library(filename):
-    file = open(filename, 'r')
+    file = open(filename, "r")
 
     name = None
     diffuse = [1.0, 1.0, 1.0]
@@ -36,49 +36,53 @@ def load_material_library(filename):
     matlib = {}
 
     for line in file:
-        if line.startswith('#'):
+        if line.startswith("#"):
             continue
         values = line.split()
         if not values:
             continue
 
-        if values[0] == 'newmtl':
+        if values[0] == "newmtl":
             if name is not None:
                 # save previous material
                 for item in (diffuse, ambient, specular, emission):
                     item.append(opacity)
-                matlib[name] = Material(name, diffuse, ambient, specular, emission, shininess, texture_name)
+                matlib[name] = Material(
+                    name, diffuse, ambient, specular, emission, shininess, texture_name
+                )
             name = values[1]
 
         elif name is None:
             raise ModelDecodeException(f'Expected "newmtl" in {filename}')
 
         try:
-            if values[0] == 'Kd':
+            if values[0] == "Kd":
                 diffuse = list(map(float, values[1:]))
-            elif values[0] == 'Ka':
+            elif values[0] == "Ka":
                 ambient = list(map(float, values[1:]))
-            elif values[0] == 'Ks':
+            elif values[0] == "Ks":
                 specular = list(map(float, values[1:]))
-            elif values[0] == 'Ke':
+            elif values[0] == "Ke":
                 emission = list(map(float, values[1:]))
-            elif values[0] == 'Ns':
-                shininess = float(values[1])            # Blender exports 1~1000
-                shininess = (shininess * 128) / 1000    # Normalize to 1~128 for OpenGL
-            elif values[0] == 'd':
+            elif values[0] == "Ns":
+                shininess = float(values[1])  # Blender exports 1~1000
+                shininess = (shininess * 128) / 1000  # Normalize to 1~128 for OpenGL
+            elif values[0] == "d":
                 opacity = float(values[1])
-            elif values[0] == 'map_Kd':
+            elif values[0] == "map_Kd":
                 texture_name = values[1]
 
         except BaseException as ex:
-            raise ModelDecodeException('Parsing error in {0}.'.format((filename, ex)))
+            raise ModelDecodeException("Parsing error in {0}.".format((filename, ex)))
 
     file.close()
 
     for item in (diffuse, ambient, specular, emission):
         item.append(opacity)
 
-    matlib[name] = Material(name, diffuse, ambient, specular, emission, shininess, texture_name)
+    matlib[name] = Material(
+        name, diffuse, ambient, specular, emission, shininess, texture_name
+    )
 
     return matlib
 
@@ -91,7 +95,7 @@ def parse_obj_file(filename, file=None):
 
     try:
         if file is None:
-            with open(filename, 'r') as f:
+            with open(filename, "r") as f:
                 file_contents = f.read()
         else:
             file_contents = asstr(file.read())
@@ -101,9 +105,9 @@ def parse_obj_file(filename, file=None):
     material = None
     mesh = None
 
-    vertices = [[0., 0., 0.]]
-    normals = [[0., 0., 0.]]
-    tex_coords = [[0., 0.]]
+    vertices = [[0.0, 0.0, 0.0]]
+    normals = [[0.0, 0.0, 0.0]]
+    tex_coords = [[0.0, 0.0]]
 
     diffuse = [1.0, 1.0, 1.0, 1.0]
     ambient = [1.0, 1.0, 1.0, 1.0]
@@ -111,40 +115,42 @@ def parse_obj_file(filename, file=None):
     emission = [0.0, 0.0, 0.0, 1.0]
     shininess = 100.0
 
-    default_material = Material("Default", diffuse, ambient, specular, emission, shininess)
+    default_material = Material(
+        "Default", diffuse, ambient, specular, emission, shininess
+    )
 
     for line in file_contents.splitlines():
 
-        if line.startswith('#'):
+        if line.startswith("#"):
             continue
         values = line.split()
         if not values:
             continue
 
-        if values[0] == 'v':
+        if values[0] == "v":
             vertices.append(list(map(float, values[1:4])))
-        elif values[0] == 'vn':
+        elif values[0] == "vn":
             normals.append(list(map(float, values[1:4])))
-        elif values[0] == 'vt':
+        elif values[0] == "vt":
             tex_coords.append(list(map(float, values[1:3])))
 
-        elif values[0] == 'mtllib':
+        elif values[0] == "mtllib":
             material_abspath = os.path.join(location, values[1])
-            materials = load_material_library(filename=material_abspath)            
+            materials = load_material_library(filename=material_abspath)
 
-        elif values[0] in ('usemtl', 'usemat'):
+        elif values[0] in ("usemtl", "usemat"):
             material = materials.get(values[1])
             if mesh is not None:
                 mesh.material = material
 
-        elif values[0] == 'o':
+        elif values[0] == "o":
             mesh = Mesh(name=values[1])
             mesh.material = default_material
             mesh_list.append(mesh)
 
-        elif values[0] == 'f':
+        elif values[0] == "f":
             if mesh is None:
-                mesh = Mesh(name='')
+                mesh = Mesh(name="")
                 mesh_list.append(mesh)
             if material is None:
                 material = default_material
@@ -160,7 +166,9 @@ def parse_obj_file(filename, file=None):
             vlast = None
 
             for i, v in enumerate(values[1:]):
-                v_i, t_i, n_i = (list(map(int, [j or 0 for j in v.split('/')])) + [0, 0])[:3]
+                v_i, t_i, n_i = (
+                    list(map(int, [j or 0 for j in v.split("/")])) + [0, 0]
+                )[:3]
                 if v_i < 0:
                     v_i += len(vertices) - 1
                 if t_i < 0:
@@ -193,9 +201,10 @@ def parse_obj_file(filename, file=None):
 #   Decoder definitions start here:
 ###################################################
 
+
 class OBJModelDecoder(ModelDecoder):
     def get_file_extensions(self):
-        return ['.obj']
+        return [".obj"]
 
     def decode(self, filename, file, batch, group=None):
 
@@ -213,19 +222,35 @@ class OBJModelDecoder(ModelDecoder):
             if material.texture_name:
                 program = pyglet.model.get_default_textured_shader()
                 texture = pyglet.resource.texture(material.texture_name)
-                matgroup = TexturedMaterialGroup(material, program, texture, parent=group)
-                vertex_lists.append(program.vertex_list(count, GL_TRIANGLES, batch, matgroup,
-                                                        position=('f', mesh.vertices),
-                                                        normals=('f', mesh.normals),
-                                                        tex_coords=('f', mesh.tex_coords),
-                                                        colors=('f', material.diffuse * count)))
+                matgroup = TexturedMaterialGroup(
+                    material, program, texture, parent=group
+                )
+                vertex_lists.append(
+                    program.vertex_list(
+                        count,
+                        GL_TRIANGLES,
+                        batch,
+                        matgroup,
+                        position=("f", mesh.vertices),
+                        normals=("f", mesh.normals),
+                        tex_coords=("f", mesh.tex_coords),
+                        colors=("f", material.diffuse * count),
+                    )
+                )
             else:
                 program = pyglet.model.get_default_shader()
                 matgroup = MaterialGroup(material, program, parent=group)
-                vertex_lists.append(program.vertex_list(count, GL_TRIANGLES, batch, matgroup,
-                                                        position=('f', mesh.vertices),
-                                                        normals=('f', mesh.normals),
-                                                        colors=('f', material.diffuse * count)))
+                vertex_lists.append(
+                    program.vertex_list(
+                        count,
+                        GL_TRIANGLES,
+                        batch,
+                        matgroup,
+                        position=("f", mesh.vertices),
+                        normals=("f", mesh.normals),
+                        colors=("f", material.diffuse * count),
+                    )
+                )
             groups.append(matgroup)
 
         return Model(vertex_lists=vertex_lists, groups=groups, batch=batch)

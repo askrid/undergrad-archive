@@ -1,34 +1,37 @@
-import pyglet
-from pyglet.math import Mat4, Vec3
+from pyglet.math import Mat4
 
 from render import RenderWindow
-from primitives import Cube,Sphere
+from primitives import Axes
+from scene import Scene
 from control import Control
+from models import build_glados
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     width = 1280
     height = 720
 
-    # Render window.
-    renderer = RenderWindow(width, height, "Hello Pyglet", resizable = True)   
+    renderer = RenderWindow(width, height, "Hello Pyglet", resizable=True)
     renderer.set_location(200, 200)
 
-    # Keyboard/Mouse control. Not implemented yet.
+    # WASD + mouse-drag camera controls (R reset, Z restart, G gizmos,
+    # ESC quit, SPACE animate).
     controller = Control(renderer)
 
-    translate_mat1 = Mat4.from_translation(vector=Vec3(x=-2, y=0, z=0))
-    translate_mat2 = Mat4.from_translation(vector=Vec3(x=0, y=0, z=0))
-    translate_mat3 = Mat4.from_translation(vector=Vec3(x=2, y=0, z=0))
+    # --- Reference axes (not part of the scene graph; they never move) ------
+    axes = Axes(length=5, tick=1, tick_size=0.08)
+    renderer.add_shape(
+        Mat4(),
+        axes.vertices,
+        axes.indices,
+        axes.colors,
+        normals=axes.normals,
+        mode=axes.mode,
+        lit=axes.lit,
+    )
 
-    scale_vec = Vec3(x=1, y=1, z=1)
+    # --- Scene: hierarchical models live in models.py -----------------------
+    scene = Scene(renderer)
+    scene.root.add_child(build_glados())
+    scene.register()
 
-    cube1 = Cube(scale_vec)
-    cube2 = Cube(Vec3(x=1.5, y=1.5, z=1.5))
-    sphere = Sphere(30,30)
-    renderer.add_shape(translate_mat1, cube1.vertices, cube1.indices, cube1.colors)
-    renderer.add_shape(translate_mat2, sphere.vertices, sphere.indices, sphere.colors)
-    renderer.add_shape(translate_mat3, cube2.vertices, cube1.indices, cube1.colors)
-
-    #draw shapes
     renderer.run()
