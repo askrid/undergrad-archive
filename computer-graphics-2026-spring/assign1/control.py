@@ -66,7 +66,9 @@ class Control:
 
     def _forward(self) -> Vec3:
         cp = math.cos(self.pitch)
-        return Vec3(cp * math.sin(self.yaw), math.sin(self.pitch), -cp * math.cos(self.yaw))
+        return Vec3(
+            cp * math.sin(self.yaw), math.sin(self.pitch), -cp * math.cos(self.yaw)
+        )
 
     def _horizontal_right(self) -> Vec3:
         return Vec3(math.cos(self.yaw), 0.0, math.sin(self.yaw))
@@ -80,6 +82,7 @@ class Control:
         if self._joint_list:
             return
         from animate import _collect_joints
+
         if self.window.scene is None:
             return
         joints: dict[str, Joint] = {}
@@ -102,11 +105,16 @@ class Control:
 
     def _print_joints(self) -> None:
         self._ensure_joints()
-        parts = [f'"{j.name}":[{",".join(f"{v:.4f}" for v in j.params)}]' for j in self._joint_list]
+        parts = [
+            f'"{j.name}":[{",".join(f"{v:.4f}" for v in j.params)}]'
+            for j in self._joint_list
+        ]
         clip = "{" + ",".join(parts) + "}"
         print(clip)
         try:
-            subprocess.Popen(["wl-copy"], stdin=subprocess.PIPE).communicate(clip.encode())
+            subprocess.Popen(["wl-copy"], stdin=subprocess.PIPE).communicate(
+                clip.encode()
+            )
         except FileNotFoundError:
             pass
 
@@ -123,7 +131,9 @@ class Control:
             if isinstance(step, TransStep) and step.index <= idx < step.index + 3:
                 label = f"trans.{'xyz'[idx - step.index]} [{idx}]"
                 break
-        print(f"[poser] {j.name}  {label} = {j.params[idx]:.4f}  (deg={math.degrees(j.params[idx]):.1f})")
+        print(
+            f"[poser] {j.name}  {label} = {j.params[idx]:.4f}  (deg={math.degrees(j.params[idx]):.1f})"
+        )
 
     def _adjust_param(self, delta_sign: int, modifiers: int) -> None:
         j = self._active_joint()
@@ -149,13 +159,21 @@ class Control:
         right = self._horizontal_right()
         up = Vec3(0.0, 1.0, 0.0)
         move = Vec3(0.0, 0.0, 0.0)
-        for k, d in [(key.W, fwd), (key.S, -fwd), (key.D, right), (key.A, -right),
-                      (key.Q, up), (key.E, -up)]:
+        for k, d in [
+            (key.W, fwd),
+            (key.S, -fwd),
+            (key.D, right),
+            (key.A, -right),
+            (key.Q, up),
+            (key.E, -up),
+        ]:
             if k in self.keys_held:
                 move = move + d
         if move.x == 0.0 and move.y == 0.0 and move.z == 0.0:
             return
-        self.window.cam_eye = self.window.cam_eye + move.normalize() * (self.MOVE_SPEED * dt)
+        self.window.cam_eye = self.window.cam_eye + move.normalize() * (
+            self.MOVE_SPEED * dt
+        )
         self._sync_target()
 
     # -- Event handlers --
@@ -202,7 +220,9 @@ class Control:
         elif symbol in (key.BRACKETLEFT, key.BRACKETRIGHT):
             if self.window.player is not None:
                 self.window.animate = False
-                self.window.player.seek_keyframe(1 if symbol == key.BRACKETRIGHT else -1)
+                self.window.player.seek_keyframe(
+                    1 if symbol == key.BRACKETRIGHT else -1
+                )
                 print(f"[scrub] t={self.window.player.elapsed:.2f}s")
 
     def on_mouse_motion(self, x: int, y: int, dx: int, dy: int) -> None:
@@ -220,9 +240,13 @@ class Control:
         if not (buttons & mouse.LEFT):
             return
         self.yaw += dx * self.MOUSE_SENS
-        self.pitch = max(-math.radians(89), min(math.radians(89), self.pitch + dy * self.MOUSE_SENS))
+        self.pitch = max(
+            -math.radians(89), min(math.radians(89), self.pitch + dy * self.MOUSE_SENS)
+        )
         self._sync_target()
 
     def on_mouse_scroll(self, x: int, y: int, scroll_x: float, scroll_y: float) -> None:
-        self.window.cam_eye = self.window.cam_eye + self._forward() * (scroll_y * self.SCROLL_STEP)
+        self.window.cam_eye = self.window.cam_eye + self._forward() * (
+            scroll_y * self.SCROLL_STEP
+        )
         self._sync_target()

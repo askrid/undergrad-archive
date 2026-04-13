@@ -56,7 +56,9 @@ class RenderWindow(pyglet.window.Window):
         )
         self.proj_mat = Mat4.perspective_projection(
             aspect=self.width / self.height,
-            z_near=self.z_near, z_far=self.z_far, fov=self.fov,
+            z_near=self.z_near,
+            z_far=self.z_far,
+            fov=self.fov,
         )
 
         # Shared shader programs (one Gouraud lit, one unlit passthrough)
@@ -120,14 +122,24 @@ class RenderWindow(pyglet.window.Window):
         if lit:
             norms = normals if normals is not None else [0.0] * (n_verts * 3)
             shape.indexed_vertices_list = prog.vertex_list_indexed(
-                n_verts, mode, batch=self.batch, group=shape,
-                indices=indice, vertices=("f", vertice),
-                colors=("Bn", color), normals=("f", norms),
+                n_verts,
+                mode,
+                batch=self.batch,
+                group=shape,
+                indices=indice,
+                vertices=("f", vertice),
+                colors=("Bn", color),
+                normals=("f", norms),
             )
         else:
             shape.indexed_vertices_list = prog.vertex_list_indexed(
-                n_verts, mode, batch=self.batch, group=shape,
-                indices=indice, vertices=("f", vertice), colors=("Bn", color),
+                n_verts,
+                mode,
+                batch=self.batch,
+                group=shape,
+                indices=indice,
+                vertices=("f", vertice),
+                colors=("Bn", color),
             )
         self.shapes.append(shape)
 

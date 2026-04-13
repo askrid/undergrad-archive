@@ -39,6 +39,7 @@ EASING = {
 @dataclass
 class Keyframe:
     """Sparse joint params at a time. Easing controls the curve arriving here."""
+
     time: float
     pose: dict[str, list[float]]
     easing: str = "smooth"
@@ -47,9 +48,15 @@ class Keyframe:
 class Timeline:
     """Ordered keyframes with lerp + easing."""
 
-    def __init__(self, keyframes: list[Keyframe], duration: float | None = None) -> None:
+    def __init__(
+        self, keyframes: list[Keyframe], duration: float | None = None
+    ) -> None:
         self.keyframes = sorted(keyframes, key=lambda k: k.time)
-        self.duration = duration if duration is not None else (self.keyframes[-1].time if self.keyframes else 0.0)
+        self.duration = (
+            duration
+            if duration is not None
+            else (self.keyframes[-1].time if self.keyframes else 0.0)
+        )
 
     def sample(self, t: float) -> dict[str, list[float]]:
         if not self.keyframes:
@@ -67,7 +74,9 @@ class Timeline:
                 break
 
         dt = nxt.time - prev.time
-        alpha = EASING.get(nxt.easing, _smoothstep)((t - prev.time) / dt if dt > 0 else 1.0)
+        alpha = EASING.get(nxt.easing, _smoothstep)(
+            (t - prev.time) / dt if dt > 0 else 1.0
+        )
 
         result: dict[str, list[float]] = {}
         for name in set(prev.pose) | set(nxt.pose):
@@ -75,7 +84,9 @@ class Timeline:
                 a, b = prev.pose[name], nxt.pose[name]
                 result[name] = [a[j] + (b[j] - a[j]) * alpha for j in range(len(a))]
             else:
-                result[name] = list((prev.pose if name in prev.pose else nxt.pose)[name])
+                result[name] = list(
+                    (prev.pose if name in prev.pose else nxt.pose)[name]
+                )
         return result
 
 
