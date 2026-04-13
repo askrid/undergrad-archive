@@ -2,7 +2,7 @@
 
 A real-time 3D scene built from scratch with Python and OpenGL (via pyglet), featuring a hierarchical GLaDOS model from Portal 2 animated through a keyframe system that recreates the "wake up" sequence.
 
-<!-- TODO: add screenshot -->
+![screenshot](./assets/glados_screenshot.png)
 
 ## How to Run
 

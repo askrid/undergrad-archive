@@ -18,7 +18,7 @@ submit :
 		Makefile requirements.txt README.md \
 		main.py render.py shader.py control.py scene.py \
 		animate.py  primitives.py model/glados.py \
-		audio/glados_wakes_up.mp3 \
+		audio/glados_wakes_up.mp3 assets/ \
 
 .PHONY: run clean submit
 
