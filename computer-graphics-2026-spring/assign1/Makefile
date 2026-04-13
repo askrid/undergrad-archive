@@ -1,6 +1,6 @@
 VENV = .venv
 SPYTHON = python3
-SUBMIT = submit.zip
+SUBMIT = 2020-17316.zip
 
 run : $(VENV)
 	$(VENV)/bin/python main.py
@@ -18,7 +18,7 @@ submit :
 		Makefile requirements.txt README.md \
 		main.py render.py shader.py control.py scene.py \
 		animate.py  primitives.py model/glados.py \
-		audio/glados_wakes_up.mp3 assets/ \
+		audio/glados_wakes_up.mp3 assets/glados_screenshot.png \
 
 .PHONY: run clean submit
 
