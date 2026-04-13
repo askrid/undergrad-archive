@@ -1,6 +1,6 @@
-# Assignment 1 -- Hierarchical Modeling & Keyframe Animation
+# Computer Graphics Assignment 1
 
-A real-time 3D scene built from scratch with Python and OpenGL (via pyglet), featuring a hierarchical GLaDOS model from Portal 2 animated through a keyframe system that recreates the "wake up" sequence.
+A 3D scene built with pyglet, displaying a hierarchical GLaDOS model from Portal 2, with animation that recreates the "wake up" sequence.
 
 ![screenshot](./assets/glados_screenshot.png)
 
@@ -9,8 +9,8 @@ A real-time 3D scene built from scratch with Python and OpenGL (via pyglet), fea
 ### Using Makefile
 
 ```bash
-make run      # creates .venv, installs deps, runs main.py
-make clean    # removes .venv
+make run
+make clean
 ```
 
 ### Manual setup
@@ -20,6 +20,8 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python main.py
 ```
+
+Press `SPACE` to run animation!
 
 ## Controls
 
@@ -64,9 +66,9 @@ The scene graph (`scene.py`) is a tree of `Node` objects, each with a local tran
 
 **Joint** is a `Node` subclass whose `local_transform` is computed from animatable parameters via an ordered list of **steps**:
 
-- **FixedStep(mat)** -- constant Mat4 (e.g., a fixed offset or orientation)
-- **RotStep(axis, index)** -- rotation by `params[index]` radians around `axis`
-- **TransStep(index)** -- translation by `Vec3(params[i], params[i+1], params[i+2])`
+- **FixedStep(mat)**: constant Mat4 (e.g., a fixed offset or orientation)
+- **RotStep(axis, index)**: rotation by `params[index]` radians around `axis`
+- **TransStep(index)**: translation by `Vec3(params[i], params[i+1], params[i+2])`
 
 Steps compose left-to-right, allowing animated transforms to be sandwiched between fixed ones (e.g., `FIXED @ ROT @ TRANS @ FIXED`).
 
@@ -88,13 +90,13 @@ Primitives are double-sided so they render correctly with backface culling enabl
 
 Two shared shader programs (`shader.py`):
 
-1. **Lit (Gouraud)** -- per-vertex ambient + Lambert diffuse with point light attenuation.
+1. **Lit (Gouraud)**: per-vertex ambient + Lambert diffuse with point light attenuation.
    Lighting is computed in the vertex shader and interpolated across faces.
    - Attenuation: `1 / (c + l*d + q*d^2)` where `d` is the light-to-vertex distance
    - No specular component
    - Light parameters: position `(5, 8, 5)`, white color, ambient `0.35`, linear attenuation `0.02`
 
-2. **Unlit (passthrough)** -- vertex colors passed through directly. Used for Axes and debug gizmos.
+2. **Unlit (passthrough)**: vertex colors passed through directly. Used for Axes and debug gizmos.
 
 Both programs share a single `view_proj` uniform updated once per frame. Per-shape `model` matrices are set via CustomGroup.
 
@@ -102,9 +104,9 @@ Both programs share a single `view_proj` uniform updated once per frame. Per-sha
 
 The animation system (`animate.py`) drives joint parameters over time:
 
-- **Keyframe** -- a timestamp + dict mapping joint names to parameter lists.
-- **Timeline** -- sorted keyframes with `sample(t)` that finds the surrounding pair and interpolates using the destination keyframe's easing function.
-- **AnimationPlayer** -- advances elapsed time, writes sampled params to joints, optionally drives a separate camera timeline and syncs audio playback.
+- **Keyframe**: a timestamp + dict mapping joint names to parameter lists.
+- **Timeline**: sorted keyframes with `sample(t)` that finds the surrounding pair and interpolates using the destination keyframe's easing function.
+- **AnimationPlayer**: advances elapsed time, writes sampled params to joints, optionally drives a separate camera timeline and syncs audio playback.
 
 #### Easing Functions
 
@@ -114,9 +116,6 @@ Each keyframe specifies an easing curve for the interpolation *arriving* at it:
 |------|---------|-----------|
 | `linear` | `t` | Constant velocity |
 | `smooth` | `3t^2 - 2t^3` (Hermite smoothstep) | Smooth start and stop (default) |
-| `ease_in` | `t^2` | Slow start, accelerating |
-| `ease_out` | `1 - (1-t)^2` | Fast start, decelerating |
-| `elastic_out` | `sin(-7pi/2 * (t+1)) * 2^(-14t) + 1` | Overshoot with damped oscillation |
 | `back_out` | `1 + (t-1)^2 * ((s+1)(t-1) + s)`, s=1.70158 | Cubic overshoot |
 
 #### Camera Animation
@@ -133,14 +132,14 @@ The player loads an MP3 file via pyglet's streaming media and maintains sync:
 
 The model (`models.py`) is a hand-built hierarchical assembly of ~60 nodes with 9 animated joints:
 
-- `ceil_disc` -- body rotation
-- `ceil_drum` -- Y-axis translation (raising/lowering)
-- `joint_ceil_drum` -- body swing
-- `joint_center1`, `joint_center2` -- torso articulation
-- `joint_neck` -- neck twist
-- `joint_head` -- 3-DOF head (pitch, roll, yaw)
-- `joint_eye_core` -- eye aim + pop-out translation
-- `joint_eye_iris` -- iris aim + pop-out translation
+- `ceil_disc`: body rotation
+- `ceil_drum`: Y-axis translation (raising/lowering)
+- `joint_ceil_drum`: body swing
+- `joint_center1`, `joint_center2`: torso articulation
+- `joint_neck`: neck twist
+- `joint_head`: 3-DOF head (pitch, roll, yaw)
+- `joint_eye_core`: eye aim + pop-out translation
+- `joint_eye_iris`: iris aim + pop-out translation
 
 The "wake up" animation is a 56-second sequence of 37 keyframes with a synchronized camera path and audio from the game.
 
@@ -161,6 +160,7 @@ assign1/
     glados.py           GLaDOS model builder + wake-up animation keyframes
   audio/
     glados_wakes_up.mp3 GLaDOS wake-up animation audio track
+  assets/               Screenshots
 ```
 
 ## References
