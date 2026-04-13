@@ -166,6 +166,5 @@ assign1/
 ## References
 
 - Point light attenuation coefficients: [LearnOpenGL - Light Casters](https://learnopengl.com/Lighting/Light-casters)
-- Smoothstep: Ken Perlin's Hermite interpolation, `3t^2 - 2t^3`
 - pyglet documentation: [pyglet.org](https://pyglet.org/)
 
