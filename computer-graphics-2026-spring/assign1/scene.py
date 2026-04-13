@@ -1,37 +1,29 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, Union, TYPE_CHECKING
 
 from pyglet.math import Mat4, Vec3
 
 from primitives import Axes, Primitive, CustomGroup
 
-# ---------------------------------------------------------------------------
-# Joint step types — describe the interleaved fixed/animatable transforms
-# that compose a Joint's local_transform.
-# ---------------------------------------------------------------------------
-
 
 @dataclass
 class FixedStep:
-    """A constant Mat4 (translation, fixed rotation, etc.)."""
-
+    """Constant Mat4 (translation, fixed rotation, etc.)."""
     mat: Mat4
 
 
 @dataclass
 class RotStep:
-    """A rotation whose angle is params[index], around *axis*."""
-
+    """Rotation by params[index] radians around axis."""
     axis: Vec3
     index: int
 
 
 @dataclass
 class TransStep:
-    """A translation whose xyz come from params[index : index+3]."""
-
+    """Translation by Vec3(params[index], params[index+1], params[index+2])."""
     index: int
 
 
@@ -42,33 +34,7 @@ if TYPE_CHECKING:
 
 
 class Node:
-    """
-    A node in the scene graph.
-
-    Holds:
-      - name            : debug label
-      - local_transform : Mat4 relative to its parent
-      - geometry        : a Primitive (Cube, Ellipsoid, Torus, Frustum,
-                          Axes, ...) or None for pure transform nodes
-                          (useful for joints/pivots)
-      - children        : list[Node]
-
-    World transform is recomputed each frame by Scene.update_world_transforms()
-    and written back to the node's CustomGroup so the renderer picks it up.
-
-    This keeps the door open for a future Joint(Node) subclass that derives its
-    local_transform from e.g. a hinge angle -- the traversal and renderer wiring
-    don't need to change.
-    """
-
-    name: str
-    _local_transform: Mat4
-    geometry: Optional[Primitive]
-    parent: Optional["Node"]
-    children: list["Node"]
-    _group: Optional[CustomGroup]
-    _world: Mat4
-    _debug_group: Optional[CustomGroup]
+    """Scene graph node. World transform propagated each frame by Scene."""
 
     def __init__(
         self,
@@ -77,17 +43,13 @@ class Node:
         geometry: Optional[Primitive] = None,
     ) -> None:
         self.name = name
-        self._local_transform = (
-            local_transform if local_transform is not None else Mat4()
-        )
+        self._local_transform = local_transform if local_transform is not None else Mat4()
         self.geometry = geometry
-        self.parent = None
-        self.children = []
-        # Populated when registered with a Scene / updated each frame:
-        self._group = None
+        self.parent: Optional[Node] = None
+        self.children: list[Node] = []
+        self._group: Optional[CustomGroup] = None
         self._world = Mat4()
-        # Optional debug gizmo (mini-axes) attached to this node's frame.
-        self._debug_group = None
+        self._debug_group: Optional[CustomGroup] = None
 
     @property
     def local_transform(self) -> Mat4:
@@ -97,28 +59,14 @@ class Node:
     def local_transform(self, value: Mat4) -> None:
         self._local_transform = value
 
-    def add_child(self, node: "Node") -> "Node":
+    def add_child(self, node: Node) -> Node:
         node.parent = self
         self.children.append(node)
         return node
 
 
 class Joint(Node):
-    """
-    A Node whose local_transform is computed from an ordered list of *steps*.
-
-    Each step is either:
-      - FixedStep(mat)      — a constant Mat4
-      - RotStep(axis, idx)  — rotation by params[idx] radians around axis
-      - TransStep(idx)      — translation by Vec3(params[idx], params[idx+1], params[idx+2])
-
-    Steps are composed left-to-right, allowing fixed and animated transforms
-    to be freely interleaved (e.g. FIXED @ JOINT @ JOINT @ FIXED).
-    """
-
-    steps: list[Step]
-    params: list[float]
-    rest_params: list[float]
+    """Node whose local_transform is computed from interleaved steps + params."""
 
     def __init__(
         self,
@@ -127,8 +75,6 @@ class Joint(Node):
         rest_params: list[float],
         geometry: Optional[Primitive] = None,
     ) -> None:
-        # Compute the initial local_transform from rest params so Node.__init__
-        # sees the correct starting value for registration.
         self.steps = steps
         self.rest_params = list(rest_params)
         self.params = list(rest_params)
@@ -143,9 +89,7 @@ class Joint(Node):
                 m = m @ Mat4.from_rotation(self.params[step.index], step.axis)
             elif isinstance(step, TransStep):
                 i = step.index
-                m = m @ Mat4.from_translation(
-                    Vec3(self.params[i], self.params[i + 1], self.params[i + 2])
-                )
+                m = m @ Mat4.from_translation(Vec3(self.params[i], self.params[i + 1], self.params[i + 2]))
         return m
 
     @property
@@ -161,51 +105,24 @@ class Joint(Node):
 
 
 class Scene:
-    """
-    Scene graph root + per-frame transform propagation.
-
-    Usage:
-        scene = Scene(renderer)
-        base = Node("base", Mat4.from_translation(Vec3(0, 0, 0)))
-        arm  = Node("arm",  Mat4.from_translation(Vec3(0, 1, 0)),
-                    geometry=Frustum(...))
-        base.add_child(arm)
-        scene.root.add_child(base)
-        scene.register()          # hooks all geometries into the renderer
-
-    After registration, mutating any node's ``local_transform`` will move that
-    node and its entire subtree on the next frame.
-    """
-
-    renderer: "RenderWindow"
-    root: Node
-    _debug_on: bool
-    _debug_size: float
+    """Scene graph root + per-frame world transform propagation."""
 
     def __init__(self, renderer: "RenderWindow") -> None:
         self.renderer = renderer
         self.root = Node(name="root")
         renderer.scene = self
-        # Debug gizmos: a mini-axes drawn at every node's world frame.
         self._debug_on = False
         self._debug_size = 0.6
 
     def register(self, node: Optional[Node] = None) -> None:
-        """Walk the subtree and add_shape every geometry-bearing node to the
-        renderer. Safe to call multiple times -- already-registered nodes are
-        skipped."""
+        """Walk subtree and register geometry-bearing nodes with the renderer."""
         if node is None:
             node = self.root
         if node.geometry is not None and node._group is None:
             g = node.geometry
             self.renderer.add_shape(
-                node.local_transform,
-                g.vertices,
-                g.indices,
-                g.colors,
-                normals=getattr(g, "normals", None),
-                mode=g.mode,
-                lit=g.lit,
+                node.local_transform, g.vertices, g.indices, g.colors,
+                normals=getattr(g, "normals", None), mode=g.mode, lit=g.lit,
             )
             node._group = self.renderer.shapes[-1]
         if self._debug_on and node._debug_group is None and node is not self.root:
@@ -213,18 +130,11 @@ class Scene:
         for child in node.children:
             self.register(child)
 
-    # --- debug gizmos -----------------------------------------------------
-
     def _attach_debug(self, node: Node) -> None:
         a = Axes(length=self._debug_size, tick=999, tick_size=0.0)
         self.renderer.add_shape(
-            node.local_transform,
-            a.vertices,
-            a.indices,
-            a.colors,
-            normals=a.normals,
-            mode=a.mode,
-            lit=a.lit,
+            node.local_transform, a.vertices, a.indices, a.colors,
+            normals=a.normals, mode=a.mode, lit=a.lit,
         )
         node._debug_group = self.renderer.shapes[-1]
 
@@ -232,10 +142,9 @@ class Scene:
         g = node._debug_group
         if g is None:
             return
-        vlist = g.indexed_vertices_list
-        if vlist is not None:
+        if g.indexed_vertices_list is not None:
             try:
-                vlist.delete()
+                g.indexed_vertices_list.delete()
             except Exception:
                 pass
         try:
@@ -254,23 +163,16 @@ class Scene:
         if size is not None:
             self._debug_size = size
         self._debug_on = True
-        self._walk_debug(
-            self.root, lambda n: n._debug_group is None and self._attach_debug(n)
-        )
+        self._walk_debug(self.root, lambda n: n._debug_group is None and self._attach_debug(n))
 
     def disable_debug_axes(self) -> None:
         self._debug_on = False
         self._walk_debug(self.root, self._detach_debug)
 
     def toggle_debug_axes(self) -> None:
-        if self._debug_on:
-            self.disable_debug_axes()
-        else:
-            self.enable_debug_axes()
+        (self.disable_debug_axes if self._debug_on else self.enable_debug_axes)()
 
     def update_world_transforms(self) -> None:
-        """DFS from the root, composing parent._world @ node.local_transform.
-        Called by RenderWindow.update() before the shader uniforms are set."""
         self._update(self.root, Mat4())
 
     def _update(self, node: Node, parent_world: Mat4) -> None:
