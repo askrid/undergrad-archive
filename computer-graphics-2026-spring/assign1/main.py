@@ -11,7 +11,7 @@ if __name__ == "__main__":
     width = 1920
     height = 1080
 
-    renderer = RenderWindow(width, height, "Hello Pyglet", resizable=True)
+    renderer = RenderWindow(width, height, "Portal 2", resizable=True)
     renderer.set_location(200, 200)
     controller = Control(renderer)
 
