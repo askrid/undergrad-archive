@@ -8,8 +8,7 @@ and writing results to Joint.params.
 
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
 import pyglet
@@ -26,33 +25,20 @@ if TYPE_CHECKING:
 def _linear(t: float) -> float:
     return t
 
+
 def _smoothstep(t: float) -> float:
     return t * t * (3.0 - 2.0 * t)
 
-def _ease_in(t: float) -> float:
-    return t * t
-
-def _ease_out(t: float) -> float:
-    return 1.0 - (1.0 - t) * (1.0 - t)
-
-def _elastic_out(t: float) -> float:
-    if t <= 0.0:
-        return 0.0
-    if t >= 1.0:
-        return 1.0
-    return math.sin(-7.0 * math.pi / 2.0 * (t + 1.0)) * math.pow(2.0, -14.0 * t) + 1.0
 
 def _back_out(t: float) -> float:
     s = 1.70158
     u = t - 1.0
     return 1.0 + u * u * ((s + 1.0) * u + s)
 
+
 EASING = {
     "linear": _linear,
     "smooth": _smoothstep,
-    "ease_in": _ease_in,
-    "ease_out": _ease_out,
-    "elastic_out": _elastic_out,
     "back_out": _back_out,
 }
 
@@ -73,7 +59,7 @@ class Keyframe:
 
     time: float
     pose: dict[str, list[float]]
-    easing: str = "ease_out"
+    easing: str = "smooth"
 
 
 class Timeline:

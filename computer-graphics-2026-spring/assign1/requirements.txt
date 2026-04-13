@@ -1,4 +1,11 @@
+black==26.3.1
+click==8.3.2
+mypy_extensions==1.1.0
 nodeenv==1.10.0
+packaging==26.0
+pathspec==1.0.4
+platformdirs==4.9.6
 pyglet==2.1.13
 pyright==1.1.408
+pytokens==0.4.1
 typing_extensions==4.15.0

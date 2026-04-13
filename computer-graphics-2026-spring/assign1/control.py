@@ -143,7 +143,9 @@ class Control:
         for step in joint.steps:
             if isinstance(step, RotStep) and step.index == param_idx:
                 return self.ROT_STEP_BIG if big else self.ROT_STEP
-            elif isinstance(step, TransStep) and step.index <= param_idx < step.index + 3:
+            elif (
+                isinstance(step, TransStep) and step.index <= param_idx < step.index + 3
+            ):
                 return self.TRANS_STEP_BIG if big else self.TRANS_STEP
         return self.ROT_STEP_BIG if big else self.ROT_STEP
 
@@ -157,9 +159,9 @@ class Control:
         clip = "{" + ",".join(lines) + "}"
         print(clip)
         try:
-            subprocess.Popen(
-                ["wl-copy"], stdin=subprocess.PIPE
-            ).communicate(clip.encode())
+            subprocess.Popen(["wl-copy"], stdin=subprocess.PIPE).communicate(
+                clip.encode()
+            )
         except FileNotFoundError:
             pass
 
