@@ -171,9 +171,9 @@ parse_request(conn_t *c)
         ver++;
     int is_11;
     if (crlf - ver == 8 && strncmp(ver, "HTTP/1.1", 8) == 0)
-        is_11 = 1;
+        is_11 = TRUE;
     else if (crlf - ver == 8 && strncmp(ver, "HTTP/1.0", 8) == 0)
-        is_11 = 0;
+        is_11 = FALSE;
     else
         return -1;
 
@@ -489,8 +489,7 @@ main(const int argc, const char **argv)
             }
 
             conn_t *c = conns[fd];
-            /* epoll does not clear ready list even when the event entry is
-             * deleted or interested events are changed */
+            /* ready list is not cleared even when the event is deleted */
             if (!c) {
                 continue;
             }
