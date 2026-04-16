@@ -21,14 +21,14 @@
 #define MAX_FD      65536
 #define SENDFILE_CHUNK (1 << 20) /* 1 MB */
 
-static const char *g_rootDir = "./";
+static const char *g_rootdir = "./";
 
-/* ---------- per-connection state machine ---------- */
+
+/* ---------- per-connection state ---------- */
 
 enum conn_state {
-    STATE_READ_REQ,
-    STATE_SEND_HDR,
-    STATE_SEND_BODY,
+    STATE_READ,
+    STATE_SEND,
 };
 
 typedef struct {
@@ -56,7 +56,7 @@ typedef struct {
 
 static conn_t *conns[MAX_FD];
 static int g_epfd;
-static int g_listenfd;
+static int g_sockfd;
 
 /* ---------- helpers ---------- */
 
@@ -74,7 +74,7 @@ conn_new(int fd)
     if (!c)
         return NULL;
     c->fd = fd;
-    c->state = STATE_READ_REQ;
+    c->state = STATE_READ;
     c->file_fd = -1;
     conns[fd] = c;
     return c;
@@ -87,7 +87,7 @@ conn_reset(conn_t *c)
         close(c->file_fd);
         c->file_fd = -1;
     }
-    c->state = STATE_READ_REQ;
+    c->state = STATE_READ;
     c->req_len = 0;
     c->url[0] = '\0';
     c->resp_hdr_len = 0;
@@ -107,15 +107,6 @@ conn_free(conn_t *c)
         close(c->file_fd);
     conns[c->fd] = NULL;
     free(c);
-}
-
-static void
-epoll_mod(int fd, uint32_t events)
-{
-    struct epoll_event ev;
-    ev.events = events | EPOLLET;
-    ev.data.fd = fd;
-    epoll_ctl(g_epfd, EPOLL_CTL_MOD, fd, &ev);
 }
 
 /* ---------- HTTP parsing ---------- */
@@ -223,11 +214,12 @@ parse_request(conn_t *c)
 /* ---------- response ---------- */
 
 static void
-build_error(conn_t *c, int code)
+prepare_error(conn_t *c, int code)
 {
     const char *reason = (code == 404) ? "Not Found" : "Bad Request";
     c->resp_hdr_len = snprintf(c->resp_hdr, MAX_HDR,
         "HTTP/1.0 %d %s\r\n"
+        "Content-length: 0\r\n"
         "Connection: close\r\n"
         "\r\n",
         code, reason);
@@ -236,7 +228,7 @@ build_error(conn_t *c, int code)
     c->file_fd = -1;
     c->file_size = 0;
     c->file_sent = 0;
-    c->state = STATE_SEND_HDR;
+    c->state = STATE_SEND;
 }
 
 static int
@@ -244,29 +236,29 @@ prepare_response(conn_t *c)
 {
     /* build file path */
     char path[MAX_URL + 256];
-    size_t rlen = strlen(g_rootDir);
+    size_t rlen = strlen(g_rootdir);
     /* avoid double slash */
-    if (rlen > 0 && g_rootDir[rlen - 1] == '/')
-        snprintf(path, sizeof(path), "%s%s", g_rootDir, c->url + 1);
+    if (rlen > 0 && g_rootdir[rlen - 1] == '/')
+        snprintf(path, sizeof(path), "%s%s", g_rootdir, c->url + 1);
     else
-        snprintf(path, sizeof(path), "%s%s", g_rootDir, c->url);
+        snprintf(path, sizeof(path), "%s%s", g_rootdir, c->url);
 
     struct stat st;
     if (stat(path, &st) < 0) {
         if (errno == ENOENT)
-            build_error(c, 404);
+            prepare_error(c, 404);
         else
-            build_error(c, 400);
+            prepare_error(c, 400);
         return 0;
     }
     if (!S_ISREG(st.st_mode)) {
-        build_error(c, 400);
+        prepare_error(c, 400);
         return 0;
     }
 
     int fd = open(path, O_RDONLY);
     if (fd < 0) {
-        build_error(c, 400);
+        prepare_error(c, 400);
         return 0;
     }
 
@@ -282,7 +274,7 @@ prepare_response(conn_t *c)
         "\r\n",
         (long)c->file_size, conn_str);
     c->resp_hdr_sent = 0;
-    c->state = STATE_SEND_HDR;
+    c->state = STATE_SEND;
     return 0;
 }
 
@@ -291,11 +283,11 @@ prepare_response(conn_t *c)
 static void
 handle_accept(void)
 {
-    /* edge-triggered: must drain all pending connections */
+    /* edge-triggered: drain all pending connections */
     for (;;) {
         struct sockaddr_in addr;
         socklen_t addrlen = sizeof(addr);
-        int fd = accept(g_listenfd, (struct sockaddr *)&addr, &addrlen);
+        int fd = accept(g_sockfd, (struct sockaddr *)&addr, &addrlen);
         if (fd < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
                 break;
@@ -310,109 +302,102 @@ handle_accept(void)
         conn_new(fd);
 
         struct epoll_event ev;
-        ev.events = EPOLLIN | EPOLLET;
+        ev.events = EPOLLIN | EPOLLOUT | EPOLLET;
         ev.data.fd = fd;
         epoll_ctl(g_epfd, EPOLL_CTL_ADD, fd, &ev);
     }
 }
 
 static void
-handle_read(conn_t *c)
+handle_conn(conn_t *c)
 {
-    /* edge-triggered: drain all available data */
     for (;;) {
-        int space = MAX_HDR - c->req_len;
-        if (space <= 0) {
-            /* header too large */
-            build_error(c, 400);
-            epoll_mod(c->fd, EPOLLOUT);
-            return;
-        }
-        ssize_t n = read(c->fd, c->req_buf + c->req_len, space);
-        if (n < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK)
-                break;
-            conn_free(c);
-            return;
-        }
-        if (n == 0) {
-            /* client closed */
-            conn_free(c);
-            return;
-        }
-        c->req_len += n;
-    }
+        if (c->state == STATE_READ) {
+            /* edge-triggered: drain all available data */
+            for (;;) {
+                int space = MAX_HDR - c->req_len;
+                if (space <= 0) {
+                    prepare_error(c, 400);
+                    break;
+                }
+                ssize_t n = read(c->fd, c->req_buf + c->req_len, space);
+                if (n < 0) {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK)
+                        break;
+                    conn_free(c);
+                    return;
+                }
+                if (n == 0) {
+                    conn_free(c);
+                    return;
+                }
+                c->req_len += n;
+            }
 
-    int ret = parse_request(c);
-    if (ret == 0)
-        return; /* incomplete, wait for more */
-    if (ret < 0) {
-        build_error(c, 400);
-        epoll_mod(c->fd, EPOLLOUT);
-        return;
-    }
-
-    /* request parsed successfully */
-    prepare_response(c);
-    epoll_mod(c->fd, EPOLLOUT);
-}
-
-static void
-handle_write(conn_t *c)
-{
-    /* send header */
-    while (c->resp_hdr_sent < c->resp_hdr_len) {
-        ssize_t n = write(c->fd,
-                          c->resp_hdr + c->resp_hdr_sent,
-                          c->resp_hdr_len - c->resp_hdr_sent);
-        if (n < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK)
-                return; /* wait for next EPOLLOUT */
-            conn_free(c);
-            return;
+            if (c->state == STATE_READ) {
+                int ret = parse_request(c);
+                if (ret == 0)
+                    return; /* incomplete, wait for more */
+                if (ret < 0)
+                    prepare_error(c, 400);
+                else
+                    prepare_response(c);
+            }
+            /* state is now STATE_SEND, fall through */
         }
-        c->resp_hdr_sent += n;
-    }
 
-    /* header done — send file body via sendfile */
-    if (c->file_fd >= 0) {
-        while (c->file_sent < c->file_size) {
-            off_t remaining = c->file_size - c->file_sent;
-            size_t chunk = remaining < SENDFILE_CHUNK ? remaining : SENDFILE_CHUNK;
-            off_t off = c->file_sent;
-            ssize_t n = sendfile(c->fd, c->file_fd, &off, chunk);
-            if (n < 0) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK)
-                    return; /* wait for next EPOLLOUT */
+        if (c->state == STATE_SEND) {
+            /* send header */
+            while (c->resp_hdr_sent < c->resp_hdr_len) {
+                ssize_t n = write(c->fd,
+                                  c->resp_hdr + c->resp_hdr_sent,
+                                  c->resp_hdr_len - c->resp_hdr_sent);
+                if (n < 0) {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK)
+                        return; /* wait for next EPOLLOUT */
+                    conn_free(c);
+                    return;
+                }
+                c->resp_hdr_sent += n;
+            }
+
+            /* send file body via sendfile */
+            if (c->file_fd >= 0) {
+                while (c->file_sent < c->file_size) {
+                    off_t remaining = c->file_size - c->file_sent;
+                    size_t chunk = remaining < SENDFILE_CHUNK ? remaining : SENDFILE_CHUNK;
+                    off_t off = c->file_sent;
+                    ssize_t n = sendfile(c->fd, c->file_fd, &off, chunk);
+                    if (n < 0) {
+                        if (errno == EAGAIN || errno == EWOULDBLOCK)
+                            return; /* wait for next EPOLLOUT */
+                        conn_free(c);
+                        return;
+                    }
+                    if (n == 0) {
+                        conn_free(c);
+                        return;
+                    }
+                    c->file_sent += n;
+                }
+            }
+
+            /* transfer complete */
+            if (c->keep_alive) {
+                conn_reset(c);
+                continue; /* loop back to STATE_READ */
+            } else {
                 conn_free(c);
                 return;
             }
-            if (n == 0) {
-                conn_free(c);
-                return;
-            }
-            c->file_sent += n;
         }
-    }
-
-    /* transfer complete */
-    if (c->keep_alive) {
-        int fd = c->fd;
-        conn_reset(c);
-        epoll_mod(fd, EPOLLIN);
-        /* edge-triggered: data may already be buffered — try reading now
-           to avoid stall when no new EPOLLIN edge arrives */
-        handle_read(c);
-        /* handle_read may have freed c — caller must not touch c after */
-    } else {
-        conn_free(c);
     }
 }
 
 /* ---------- main ---------- */
 
 static void
-PrintUsage(const char *prog)
+print_usage(const char *prog)
 {
     printf("usage: %s -p port -d rootDirectory(optional)\n", prog);
 }
@@ -429,31 +414,31 @@ main(const int argc, const char **argv)
             port = atoi(argv[i + 1]);
             i++;
         } else if (strcmp(argv[i], "-d") == 0 && (i + 1) < argc) {
-            g_rootDir = argv[i + 1];
+            g_rootdir = argv[i + 1];
             i++;
         }
     }
     if (port <= 0 || port > 65535) {
-        PrintUsage(argv[0]);
+        print_usage(argv[0]);
         exit(-1);
     }
-    if (access(g_rootDir, R_OK | X_OK) < 0) {
+    if (access(g_rootdir, R_OK | X_OK) < 0) {
         fprintf(stderr, "root dir %s inaccessible, errno=%d\n",
-                g_rootDir, errno);
-        PrintUsage(argv[0]);
+                g_rootdir, errno);
+        print_usage(argv[0]);
         exit(-1);
     }
 
     signal(SIGPIPE, SIG_IGN);
 
     /* create listening socket */
-    g_listenfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (g_listenfd < 0) {
+    g_sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (g_sockfd < 0) {
         perror("socket");
         exit(EXIT_FAILURE);
     }
     int opt = 1;
-    setsockopt(g_listenfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    setsockopt(g_sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
     struct sockaddr_in saddr;
     memset(&saddr, 0, sizeof(saddr));
@@ -461,15 +446,15 @@ main(const int argc, const char **argv)
     saddr.sin_addr.s_addr = htonl(INADDR_ANY);
     saddr.sin_port = htons(port);
 
-    if (bind(g_listenfd, (struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
+    if (bind(g_sockfd, (struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
         perror("bind");
         exit(EXIT_FAILURE);
     }
-    if (listen(g_listenfd, 128) < 0) {
+    if (listen(g_sockfd, 128) < 0) {
         perror("listen");
         exit(EXIT_FAILURE);
     }
-    set_nonblocking(g_listenfd);
+    set_nonblocking(g_sockfd);
 
     /* create epoll */
     g_epfd = epoll_create(1);
@@ -480,8 +465,8 @@ main(const int argc, const char **argv)
 
     struct epoll_event ev;
     ev.events = EPOLLIN | EPOLLET;
-    ev.data.fd = g_listenfd;
-    if (epoll_ctl(g_epfd, EPOLL_CTL_ADD, g_listenfd, &ev) < 0) {
+    ev.data.fd = g_sockfd;
+    if (epoll_ctl(g_epfd, EPOLL_CTL_ADD, g_sockfd, &ev) < 0) {
         perror("epoll_ctl: listen");
         exit(EXIT_FAILURE);
     }
@@ -498,34 +483,24 @@ main(const int argc, const char **argv)
         }
         for (i = 0; i < nfds; i++) {
             int fd = events[i].data.fd;
-
-            if (fd == g_listenfd) {
+            if (fd == g_sockfd) {
                 handle_accept();
                 continue;
             }
 
             conn_t *c = conns[fd];
+            /* epoll does not clear ready list even when the event entry is
+             * deleted or interested events are changed */
             if (!c) {
-                epoll_ctl(g_epfd, EPOLL_CTL_DEL, fd, NULL);
-                close(fd);
                 continue;
             }
-
             if (events[i].events & (EPOLLERR | EPOLLHUP)) {
                 conn_free(c);
                 continue;
             }
-
-            if (events[i].events & EPOLLIN)
-                handle_read(c);
-
-            /* re-check: handle_read may have freed c */
-            c = conns[fd];
-            if (!c)
-                continue;
-
-            if (events[i].events & EPOLLOUT)
-                handle_write(c);
+            if (((events[i].events & EPOLLIN) && c->state == STATE_READ) ||
+                ((events[i].events & EPOLLOUT) && c->state == STATE_SEND))
+                handle_conn(c);
         }
     }
 
