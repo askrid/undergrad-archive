@@ -10,6 +10,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <arpa/inet.h>
+#include <stdint.h>
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/sendfile.h>
@@ -32,26 +33,20 @@ enum conn_state {
 };
 
 typedef struct {
-    int fd;
-    enum conn_state state;
-
-    /* request accumulation (+1 for null terminator) */
-    char req_buf[MAX_HDR + 1];
-    int req_len;
-
-    /* parsed fields */
-    char url[MAX_URL];
-    int keep_alive;
-
-    /* response header */
-    char resp_hdr[MAX_HDR];
-    int resp_hdr_len;
-    int resp_hdr_sent;
-
-    /* file body */
-    int file_fd;
     off_t file_size;
     off_t file_sent;
+
+    char req_buf[MAX_HDR + 1];
+    char url[MAX_URL];
+    char resp_hdr[MAX_HDR];
+
+    int fd;
+    int file_fd;
+    int16_t req_len;
+    int16_t resp_hdr_len;
+    int16_t resp_hdr_sent;
+    uint8_t state;       /* conn_state */
+    uint8_t keep_alive;
 } conn_t;
 
 static conn_t *conns[MAX_FD];
@@ -111,7 +106,7 @@ conn_free(conn_t *c)
 
 /* ---------- HTTP parsing ---------- */
 
-/* case-insensitive header name match (RFC 1945: field names are case-insensitive) */
+/* case-insensitive header name match */
 static int
 header_match(const char *line, const char *name)
 {
@@ -136,7 +131,7 @@ parse_request(conn_t *c)
         return 0; /* need more data */
     }
 
-    /* null-terminate for string ops (safe: end+4 <= req_buf+MAX_HDR) */
+    /* null-terminate for string ops (safe: req_buf is MAX_HDR+1) */
     *(end + 4) = '\0';
 
     char *line = c->req_buf;
@@ -196,10 +191,10 @@ parse_request(conn_t *c)
                 val++;
             if (strncasecmp(val, "keep-alive", 10) == 0 &&
                 (val[10] == '\r' || val[10] == ' ' || val[10] == '\0'))
-                c->keep_alive = 1;
+                c->keep_alive = TRUE;
             else if (strncasecmp(val, "close", 5) == 0 &&
                 (val[5] == '\r' || val[5] == ' ' || val[5] == '\0'))
-                c->keep_alive = 0;
+                c->keep_alive = FALSE;
         }
 
         line = crlf + 2;
