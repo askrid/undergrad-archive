@@ -4,3 +4,6 @@
 [submodule "natural-language-processing-2025-fall/multilang-simtrans"]
 	path = natural-language-processing-2025-fall/multilang-simtrans
 	url = git@github.com:askrid/multilang-simtrans
+[submodule "swpp-2022-fall/cago"]
+	path = swpp-2022-fall/cago
+	url = git@github.com:askrid/cago
