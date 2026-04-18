@@ -1,4 +1,4 @@
-# Solar Gongisa
+# Solarcar
 
 Solar-powered line-following RC car for the Solar AI Mobility Camp competition.
 
