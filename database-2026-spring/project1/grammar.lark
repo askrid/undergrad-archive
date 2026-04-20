@@ -138,7 +138,7 @@ offset_clause : OFFSET INT
 // INSERT
 insert_query : INSERT INTO table_name [column_name_list] VALUES value_list
 value_list : LP value ("," value)* RP
-value : INT | STR | DATE
+value : INT | STR | DATE | NULL
 
 // DELETE
 delete_query : DELETE FROM table_name [where_clause]

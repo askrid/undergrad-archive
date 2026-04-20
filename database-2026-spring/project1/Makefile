@@ -2,7 +2,10 @@ STUDENTID = 2020-17316
 SUBMITFILE = PRJ1-2_$(STUDENTID)
 SPYTHON = python3.12
 VENV = .venv
-FILES = run.py grammar.lark requirements.txt README.md README.pdf Makefile test_grammar.sh DB/
+FILES = run.py grammar.lark requirements.txt \
+		README.md $(SUBMITFILE).pdf  \
+		Makefile test.sh \
+		DB/
 
 run: $(VENV)
 	$(VENV)/bin/python run.py
@@ -14,7 +17,7 @@ $(VENV): requirements.txt
 	touch $(VENV)
 
 test: $(VENV)
-	PATH=$(VENV)/bin:$$PATH bash test_grammar.sh
+	PATH=$(VENV)/bin:$$PATH bash test.sh
 
 submit: $(FILES)
 	zip $(SUBMITFILE).zip $(FILES)
