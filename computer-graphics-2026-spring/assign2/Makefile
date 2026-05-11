@@ -77,7 +77,8 @@ submit :
 		main.py render.py shader.py control.py scene.py \
 		primitives.py obj_io.py surfaces.py \
 		gen_init_eve.py compose.py mirror_obj.py view_eve.py \
-		model/**/*.obj model/*.obj
+		model/**/*.obj model/*.obj \
+		docs/*
 
 .PHONY: run bezier bspline cube ico \
         eve-head eve-body eve-visor eve-arm eve-eye eve-view eve-compose \
