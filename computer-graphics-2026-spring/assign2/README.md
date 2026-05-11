@@ -2,6 +2,9 @@
 
 ![screenshot_cube](./docs/screenshot_cube.png)
 
+> Screenshots and a demo video are under `docs/`.
+> Exported `.obj` files are under `models/`.
+
 ## Build & Run
 
 ```
@@ -96,31 +99,4 @@ The `--ref` flag loads other parts as dim static meshes for alignment.
 `make eve-compose` mirrors L parts to R and merges everything into one obj.
 `make eve-view` renders the composite with per-part materials (glossy white
 shell, black visor, blue eyes).
-
-## Exported .obj files
-
-All under `model/`:
-
-```
-model/grid.obj                        demo Bezier/B-spline 4x4 cage
-model/grid_bezier_surface.obj         Bezier surface from grid
-model/grid_bspline_surface.obj        B-spline surface from grid
-model/cross_cube.obj                  demo CC cage (plus-cube)
-model/cross_cube_surface.obj          CC surface from cross-cube
-model/icosahedron.obj                 demo CC cage (icosahedron)
-model/icosahedron_surface.obj         CC surface from icosahedron
-model/art/head.obj                    head cage (CC)
-model/art/head_surface.obj            head surface
-model/art/body.obj                    body cage (CC)
-model/art/body_surface.obj            body surface
-model/art/visor.obj                   visor cage (Bezier)
-model/art/visor_surface.obj           visor surface
-model/art/arm_l.obj                   left arm cage (CC)
-model/art/arm_l_surface.obj           left arm surface
-model/art/arm_r_surface.obj           right arm (X-mirrored)
-model/art/eye_l.obj                   left eye cage (CC)
-model/art/eye_l_surface.obj           left eye surface
-model/art/eye_r_surface.obj           right eye (X-mirrored)
-model/art/eve.obj                     final composite
-```
 
