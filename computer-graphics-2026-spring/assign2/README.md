@@ -1,6 +1,6 @@
 # PA2 — Surfaces & Subdivision
 
-2020-17316
+![screenshot_cube](./docs/screenshot_cube.png)
 
 ## Build & Run
 
@@ -95,7 +95,7 @@ Workflow: edit each part with `make eve-head`, `make eve-body`, etc.
 The `--ref` flag loads other parts as dim static meshes for alignment.
 `make eve-compose` mirrors L parts to R and merges everything into one obj.
 `make eve-view` renders the composite with per-part materials (glossy white
-shell, reflective black visor, bright blue eyes).
+shell, black visor, blue eyes).
 
 ### File organization
 
