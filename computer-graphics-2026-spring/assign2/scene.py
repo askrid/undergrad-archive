@@ -178,10 +178,6 @@ class Scene:
                 self.transform, _flat(verts), flat_idx, colors, _flat(normals),
             )
         else:
-            # Swap the vlist on the existing group: avoids shader recompile
-            # and works around a pyglet 2.1.x quirk where the in-place
-            # ``vlist.vertices[:] = …`` path leaves the GPU rendering stale
-            # positions after a topology rebuild + cage edit.
             self.window.replace_mesh_vlist(
                 self.surface_group, _flat(verts), flat_idx, colors, _flat(normals),
             )
@@ -190,7 +186,6 @@ class Scene:
             self._rebuild_surface_pts(verts)
 
     def _rebuild_surface_pts(self, verts: Sequence[V3]) -> None:
-        """Recreate the cyan sample-dot overlay for the current surface."""
         if self.surface_pts_group is not None:
             self.window.remove_group(self.surface_pts_group)
             self.surface_pts_group = None
@@ -217,10 +212,7 @@ class Scene:
         print(f"[cage] {'ON' if self.show_cage else 'OFF'}")
 
     def load_references(self, paths: Sequence[str]) -> None:
-        """Load .obj files as static dim meshes for alignment reference.
-
-        Missing files are silently skipped (surfaces may not exist yet).
-        """
+        """Load .obj files as dim static meshes. Missing files skipped."""
         for path in paths:
             if not os.path.isfile(path):
                 continue
@@ -313,11 +305,7 @@ class Scene:
     _DEGENERATE = [0.0] * 12
 
     def _show_mirror_plane(self) -> None:
-        """Show translucent quad + border on the mirror plane.
-
-        Groups are created once and kept alive — only vertices are updated.
-        Avoids pyglet batch/uniform issues from repeated group destruction.
-        """
+        # Groups created once, then only vertices updated (pyglet batch quirk).
         verts = self._mirror_plane_verts()
         if self._mirror_fill is None:
             tri_idx = [0, 1, 2, 0, 2, 3]
@@ -340,7 +328,6 @@ class Scene:
     # ---- undo / redo ----
 
     def push_undo(self) -> None:
-        """Snapshot cage_verts before a destructive edit. Clears redo stack."""
         self._undo.append(list(self.cage_verts))
         self._redo.clear()
 
@@ -378,7 +365,6 @@ class Scene:
     NUDGE_STEP: float = 0.05
 
     def nudge(self, dx: float, dy: float, dz: float) -> None:
-        """Translate the entire cage by (dx, dy, dz) * NUDGE_STEP."""
         self.push_undo()
         sx, sy, sz = dx * self.NUDGE_STEP, dy * self.NUDGE_STEP, dz * self.NUDGE_STEP
         self.cage_verts = [(x + sx, y + sy, z + sz) for x, y, z in self.cage_verts]
@@ -403,7 +389,6 @@ class Scene:
     # ---- save ----
 
     def save(self) -> None:
-        """Overwrite cage file in-place + write surface beside it."""
         obj_io.save_obj(self.cage_path, self.cage_verts, self.cage_faces,
                         comment=f"{self.name} cage")
         surf_path = _surface_path(self.cage_path)
@@ -413,7 +398,6 @@ class Scene:
         print(f"[saved] {surf_path}")
 
     def save_versioned(self) -> None:
-        """Save a versioned snapshot: <name>_vNNN.obj + <name>_vNNN_surface.obj."""
         v = _next_version(self.cage_path)
         root, ext = os.path.splitext(self.cage_path)
         cage_v = f"{root}_v{v:03d}{ext}"
@@ -490,7 +474,6 @@ class CatmullClarkScene(Scene):
         self.rebuild_surface()
 
     def save(self) -> None:
-        """Overwrite cage in-place + write surface at current subdivision level."""
         obj_io.save_obj(self.cage_path, self.cage_verts, self.cage_faces,
                         comment=f"catmull-clark cage (level 0)")
         surf_path = _surface_path(self.cage_path)

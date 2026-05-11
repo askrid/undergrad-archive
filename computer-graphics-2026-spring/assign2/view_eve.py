@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Load all EVE surface parts with per-part colors and render them.
+"""Composite viewer for EVE model parts.
 
 Usage: python view_eve.py [model/art]
 
-Discovers *_surface.obj in the art directory, auto-mirrors _l → _r parts
-in memory, assigns per-part materials, and shows them with orbit/pan/zoom.
+Loads *_surface.obj from the art directory with per-part materials.
 """
 import os
 import sys
@@ -16,10 +15,9 @@ import surfaces
 from control import Control
 from render import RenderWindow
 
-# ---- Per-part color + material (k_a, k_d, k_s, shininess) ----
-# Only define _l sides; _r is derived automatically.
-
+# Per-part color + material. _r inherits from _l.
 PartStyle = tuple[tuple[int, int, int, int], float, float, float, float]
+#                  RGBA                      k_a    k_d    k_s    shininess
 
 PART_STYLES: dict[str, PartStyle] = {
     "head":  ((255, 255, 255, 255), 0.25, 0.75, 0.6,  64.0),
@@ -68,7 +66,6 @@ if __name__ == "__main__":
     window.atten_a, window.atten_b, window.atten_c = 1.0, 0.02, 0.002
 
     load_parts(window, art_dir)
-    # Reuse Control for orbit/pan/zoom (works without a scene manager).
     ctrl = Control(window)
     ctrl.frame_scene(Vec3(0.0, 1.2, 0.0), 5.0)
     window.run()

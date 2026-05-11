@@ -34,9 +34,6 @@ class Control:
         self.window = window
         self.scene = scene_manager
 
-        # push_handlers (canonical pyglet 2.x). Plain ``window.on_X = fn``
-        # assignment can be shadowed by class-level handlers on the Window
-        # subclass; the stack-based form is robust.
         window.push_handlers(
             on_key_press=self.on_key_press,
             on_key_release=self.on_key_release,
@@ -151,8 +148,6 @@ class Control:
 
     def on_mouse_press(self, x: int, y: int, button: int, modifier: int) -> None:
         self.last_mouse = (x, y)
-        # Reset drag state in case a previous release was missed (release
-        # outside window, focus loss, etc.).
         self.dragging_point = None
         self.dragging_camera = None
         if button == mouse.LEFT:

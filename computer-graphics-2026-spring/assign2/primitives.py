@@ -35,7 +35,7 @@ class FlatGroup(pyglet.graphics.Group):
 
 
 class LitGroup(pyglet.graphics.Group):
-    """Lit surface group: per-vertex normals + Gouraud shading."""
+    """Lit surface group: per-vertex normals + Phong shading."""
 
     def __init__(self, transform_mat: Mat4, order: int) -> None:
         super().__init__(order)

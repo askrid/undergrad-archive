@@ -102,9 +102,7 @@ class RenderWindow(pyglet.window.Window):
 
     def add_points(self, transform: Mat4, vertices: Sequence[float],
                    colors: Sequence[int]) -> FlatGroup:
-        # Points draw last and ignore depth so cage handles stay clickable
-        # even when the surface mesh covers them (Catmull-Clark vertices lie
-        # on the subdivided surface and would otherwise z-fight).
+        # Points: always on top so cage handles stay clickable.
         group = FlatGroup(transform, order=1_000_000, depth_test=False)
         vlist = group.shader_program.vertex_list(
             len(vertices) // 3, GL_POINTS,
@@ -131,7 +129,7 @@ class RenderWindow(pyglet.window.Window):
     def add_flat_triangles(self, transform: Mat4, vertices: Sequence[float],
                            indices: Sequence[int], colors: Sequence[int],
                            order: int = 500_000) -> FlatGroup:
-        """Flat-shaded (unlit) triangles — used for overlays like the mirror plane."""
+        """Unlit triangles for overlays."""
         group = FlatGroup(transform, order)
         vlist = group.shader_program.vertex_list_indexed(
             len(vertices) // 3, GL_TRIANGLES,
@@ -145,8 +143,7 @@ class RenderWindow(pyglet.window.Window):
     def replace_mesh_vlist(self, group: LitGroup, vertices: Sequence[float],
                            indices: Sequence[int], colors: Sequence[int],
                            normals: Sequence[float]) -> None:
-        """Swap the GL vlist on an existing mesh group, keeping the shader
-        program alive. Avoids shader recompile and batch-domain churn."""
+        """Swap vlist on an existing group (avoids shader recompile)."""
         old = group.indexed_vertices_list
         if old is not None:
             old.delete()
