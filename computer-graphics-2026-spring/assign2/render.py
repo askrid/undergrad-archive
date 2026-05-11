@@ -128,6 +128,20 @@ class RenderWindow(pyglet.window.Window):
         self.shapes.append((group, vlist))
         return group
 
+    def add_flat_triangles(self, transform: Mat4, vertices: Sequence[float],
+                           indices: Sequence[int], colors: Sequence[int],
+                           order: int = 500_000) -> FlatGroup:
+        """Flat-shaded (unlit) triangles — used for overlays like the mirror plane."""
+        group = FlatGroup(transform, order)
+        vlist = group.shader_program.vertex_list_indexed(
+            len(vertices) // 3, GL_TRIANGLES,
+            batch=self.batch, group=group, indices=indices,
+            vertices=("f", vertices), colors=("Bn", colors),
+        )
+        group.indexed_vertices_list = vlist
+        self.shapes.append((group, vlist))
+        return group
+
     def replace_mesh_vlist(self, group: LitGroup, vertices: Sequence[float],
                            indices: Sequence[int], colors: Sequence[int],
                            normals: Sequence[float]) -> None:

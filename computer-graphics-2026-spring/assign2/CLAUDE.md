@@ -20,10 +20,10 @@ model, take screenshots, write the submission doc, record <3 min video.
 ## Run
 
 ```bash
-make run-bezier         # python main.py bezier  model/spline/grid.obj
-make run-bspline        # python main.py bspline model/spline/grid.obj
-make run-cc-cube        # python main.py catmull model/subdiv/cross_cube.obj
-make run-cc-ico         # python main.py catmull model/subdiv/icosahedron.obj
+make run-bezier         # python main.py bezier  model/grid.obj
+make run-bspline        # python main.py bspline model/grid.obj
+make run-cc-cube        # python main.py catmull model/cross_cube.obj
+make run-cc-ico         # python main.py catmull model/icosahedron.obj
 make submit             # zip into 2020-17316.zip
 ```
 
@@ -41,12 +41,15 @@ scroll        zoom
 S / Shift+S   subdivide ±  (Catmull-Clark)
 F / Shift+F   reframe / focus selected
 V             toggle sample-vert dots (sky-400)
-E             export .obj  → out/<base>_<name>_*.obj
+M             toggle X-axis mirror editing
+E             save cage (overwrite) + surface beside it
+Shift+E       save versioned snapshot (_vNNN)
 ESC           quit
 ```
 
-`E` for CC writes `<base>_<name>_L0_cage.obj` and `_L1..L5.obj`. For
-spline scenes it writes `_cage.obj` and `_surface.obj`.
+`E` overwrites the loaded cage .obj in-place and writes/overwrites
+`<name>_surface.obj` beside it. `Shift+E` writes `<name>_vNNN.obj` +
+`<name>_vNNN_surface.obj` (auto-incrementing, never overwrites).
 
 ## Architecture (8 modules, ~1170 LoC)
 
@@ -76,10 +79,10 @@ surfaces.py    Vec helpers, Bernstein + cubic-BSpline basis (+ derivs).
                compute_vertex_normals() — face-normal averaging.
 scene.py       Scene base + BezierScene / BSplineScene / CatmullClarkScene.
                SceneManager routes Control delegate calls + E/F/V/S keys.
-model/         spline/grid.obj         4x4 flat net (16 V, 9 quads)
-               subdiv/cross_cube.obj   plus-cube (32 V, 30 quads)
-               subdiv/icosahedron.obj  (12 V, 20 tris)
-out/           Per-mode export target. .gitignored upstream.
+model/         grid.obj                4x4 flat net (16 V, 9 quads)
+               cross_cube.obj          plus-cube (32 V, 30 quads)
+               icosahedron.obj         (12 V, 20 tris)
+               art/                    artistic model parts (cage .objs)
 ```
 
 ## Key design decisions

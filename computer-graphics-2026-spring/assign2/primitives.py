@@ -40,7 +40,7 @@ class LitGroup(pyglet.graphics.Group):
     def __init__(self, transform_mat: Mat4, order: int) -> None:
         super().__init__(order)
         self.shader_program = shader.create_program(
-            shader.vertex_source_gouraud, shader.fragment_source_gouraud,
+            shader.vertex_source_phong, shader.fragment_source_phong,
         )
         self.transform_mat: Mat4 = transform_mat
         self.indexed_vertices_list: Optional[object] = None

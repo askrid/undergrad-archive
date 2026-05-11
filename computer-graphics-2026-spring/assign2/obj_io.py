@@ -6,7 +6,7 @@ control nets stay native. Vertex indices in returned faces are 0-based.
 from __future__ import annotations
 
 import os
-from typing import List, Tuple
+from typing import List, Sequence, Tuple
 
 
 Vertex = Tuple[float, float, float]
@@ -51,6 +51,21 @@ def save_obj(path: str, verts: List[Vertex], faces: List[Face], comment: str | N
         for face in faces:
             ids = " ".join(str(i + 1) for i in face)
             f.write(f"f {ids}\n")
+
+
+def flatten_v3(vs: Sequence[Vertex]) -> List[float]:
+    """Flatten [(x,y,z), ...] → [x, y, z, ...] for GL upload."""
+    out: List[float] = []
+    for x, y, z in vs:
+        out += [float(x), float(y), float(z)]
+    return out
+
+
+def mirror_x(verts: List[Vertex], faces: List[Face]) -> tuple[List[Vertex], List[Face]]:
+    """Negate X coords and reverse face winding (keeps normals outward)."""
+    mirrored = [(-x, y, z) for x, y, z in verts]
+    flipped = [list(reversed(f)) for f in faces]
+    return mirrored, flipped
 
 
 def triangulate(faces: List[Face]) -> List[Face]:

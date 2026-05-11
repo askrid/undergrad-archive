@@ -158,6 +158,8 @@ class Control:
         if button == mouse.LEFT:
             hit = self._pick(x, y)
             if hit is not None and self.scene is not None:
+                self.scene.push_undo()
+                self.scene.begin_drag()
                 self.dragging_point = hit
                 self.scene.set_selected(hit)
             else:
@@ -166,6 +168,8 @@ class Control:
             self.dragging_camera = "pan"
 
     def on_mouse_release(self, x: int, y: int, button: int, modifier: int) -> None:
+        if self.dragging_point is not None and self.scene is not None:
+            self.scene.end_drag()
         self.dragging_point = None
         self.dragging_camera = None
 

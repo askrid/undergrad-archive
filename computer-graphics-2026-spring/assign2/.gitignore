@@ -1,1 +1,5 @@
 __pycache__/**
+out/
+*_surface.obj
+*_v[0-9][0-9][0-9].obj
+*_v[0-9][0-9][0-9]_surface.obj
