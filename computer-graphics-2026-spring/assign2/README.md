@@ -3,6 +3,7 @@
 ![screenshot_cube](./docs/screenshot_cube.png)
 
 > Screenshots and a demo video are under `docs/`.
+
 > Exported `.obj` files are under `models/`.
 
 ## Build & Run
