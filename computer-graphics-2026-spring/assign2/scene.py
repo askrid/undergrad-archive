@@ -15,7 +15,6 @@ from collections import deque
 from typing import Deque, Dict, List, Optional, Sequence, Tuple
 
 from pyglet.math import Mat4, Vec3
-from pyglet.window import key
 
 import obj_io
 import surfaces
@@ -149,8 +148,9 @@ class Scene:
     def _surface_color(self) -> Tuple[int, int, int, int]:
         return SURFACE_FILL
 
-    def on_key(self, symbol: int, modifier: int) -> None:
-        pass
+    # Subdivide actions: no-op on base, CC overrides.
+    def subdivide_up(self) -> None: pass
+    def subdivide_down(self) -> None: pass
 
     # ---- visuals ----
 
@@ -243,7 +243,7 @@ class Scene:
             cols[base:base + 4] = list(SELECTED_POINT)
         self.cage_points_group.indexed_vertices_list.colors[:] = cols
 
-    # ---- edit API (called by Control via SceneManager) ----
+    # ---- edit API (called by Control) ----
 
     def cage_points(self) -> List[Vec3]:
         if not self.show_cage:
@@ -410,6 +410,7 @@ class Scene:
         print(f"[snapshot] {surf_v}")
 
 
+
 # ============================================================
 # Bezier / B-Spline (bicubic patches tiled over an MxN net)
 # ============================================================
@@ -463,13 +464,13 @@ class CatmullClarkScene(Scene):
         normals = surfaces.compute_vertex_normals(verts, obj_io.triangulate(faces))
         return verts, normals, faces
 
-    def on_key(self, symbol: int, modifier: int) -> None:
-        if symbol != key.S:
-            return
-        if modifier & key.MOD_SHIFT:
-            self.level = max(0, self.level - 1)
-        else:
-            self.level = min(self.max_level, self.level + 1)
+    def subdivide_up(self) -> None:
+        self.level = min(self.max_level, self.level + 1)
+        print(f"[catmull-clark] level={self.level}")
+        self.rebuild_surface()
+
+    def subdivide_down(self) -> None:
+        self.level = max(0, self.level - 1)
         print(f"[catmull-clark] level={self.level}")
         self.rebuild_surface()
 
@@ -484,73 +485,3 @@ class CatmullClarkScene(Scene):
         print(f"[saved] {surf_path} (L{self.level})")
 
 
-# ============================================================
-# Manager: routes Control calls and key events
-# ============================================================
-
-class SceneManager:
-    def __init__(self, window, scene: Scene) -> None:
-        self.window = window
-        self.current: Scene = scene
-        self.controller = None  # set by main.py after Control() is built
-
-    # ---- delegated by Control ----
-
-    def cage_points(self) -> List[Vec3]:
-        return self.current.cage_points()
-
-    def push_undo(self) -> None:
-        self.current.push_undo()
-
-    def begin_drag(self) -> None:
-        self.current.begin_drag()
-
-    def end_drag(self) -> None:
-        self.current.end_drag()
-
-    def move_point(self, idx: int, delta: Vec3) -> None:
-        self.current.move_point(idx, delta)
-
-    def set_selected(self, idx: Optional[int]) -> None:
-        self.current.set_selected(idx)
-
-    def frame_request(self, controller, on_selection: bool = False) -> None:
-        if on_selection and self.current.selected is not None:
-            v = self.current.cage_verts[self.current.selected]
-            controller.frame_scene(Vec3(*v), controller.radius)
-        else:
-            center, radius = self.current.center_and_radius()
-            controller.frame_scene(center, radius)
-
-    def frame_initial(self) -> None:
-        if self.controller is not None:
-            self.frame_request(self.controller)
-
-    _NUDGE_MAP = {
-        key.H: (-1, 0, 0), key.L: (1, 0, 0),
-        key.J: (0, -1, 0), key.K: (0, 1, 0),
-        key.N: (0, 0, -1), key.COMMA: (0, 0, 1),
-    }
-
-    def on_key(self, symbol: int, modifier: int) -> None:
-        if symbol in self._NUDGE_MAP:
-            dx, dy, dz = self._NUDGE_MAP[symbol]
-            self.current.nudge(dx, dy, dz)
-        elif symbol == key.Z:
-            if modifier & key.MOD_SHIFT:
-                self.current.redo()
-            else:
-                self.current.undo()
-        elif symbol == key.E:
-            if modifier & key.MOD_SHIFT:
-                self.current.save_versioned()
-            else:
-                self.current.save()
-        elif symbol == key.M:
-            self.current.toggle_mirror()
-        elif symbol == key.C:
-            self.current.toggle_cage()
-        elif symbol == key.V:
-            self.current.toggle_surface_pts()
-        else:
-            self.current.on_key(symbol, modifier)

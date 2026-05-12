@@ -12,6 +12,8 @@ import pyglet
 from pyglet.math import Mat4, Vec3, Vec4
 from pyglet.window import key, mouse
 
+from scene import Scene
+
 
 PICK_RADIUS_PX: float = 12.0
 ORBIT_SENS: float = 0.005
@@ -30,9 +32,9 @@ def _project(pt: Vec3, view_proj: Mat4, w: int, h: int
 
 
 class Control:
-    def __init__(self, window, scene_manager: Optional[object] = None) -> None:
+    def __init__(self, window, scene: Optional[Scene] = None) -> None:
         self.window = window
-        self.scene = scene_manager
+        self.scene = scene
 
         window.push_handlers(
             on_key_press=self.on_key_press,
@@ -119,25 +121,49 @@ class Control:
                 best = i
         return best
 
-    def _drag_world_delta(self, idx: int, dx: float, dy: float) -> Vec3:
+    def _drag_world_delta(self, p: Vec3, dx: float, dy: float) -> Vec3:
         """Convert pixel delta to a world-space offset in the view plane."""
         fwd = (self.window.cam_target - self.window.cam_eye).normalize()
         right = fwd.cross(self.window.cam_vup).normalize()
         up = right.cross(fwd).normalize()
-        p: Vec3 = self.scene.cage_points()[idx]
         depth = max((p - self.window.cam_eye).dot(fwd), 0.1)
         world_per_px = 2.0 * depth * math.tan(math.radians(self.window.fov) * 0.5) / self.window.height
         return right * (dx * world_per_px) + up * (dy * world_per_px)
 
-    # ---------- Events ----------
+    # ---------- Key dispatch ----------
+
+    _NUDGE_MAP = {
+        key.H: (-1, 0, 0), key.L: (1, 0, 0),
+        key.J: (0, -1, 0), key.K: (0, 1, 0),
+        key.N: (0, 0, -1), key.COMMA: (0, 0, 1),
+    }
 
     def on_key_press(self, symbol: int, modifier: int) -> None:
-        if symbol == key.F:
-            if self.scene is not None and hasattr(self.scene, "frame_request"):
-                self.scene.frame_request(self, on_selection=bool(modifier & key.MOD_SHIFT))
+        s = self.scene
+        if s is None:
             return
-        if self.scene is not None and hasattr(self.scene, "on_key"):
-            self.scene.on_key(symbol, modifier)
+        shift = bool(modifier & key.MOD_SHIFT)
+        if symbol == key.F:
+            if shift and s.selected is not None:
+                v = s.cage_verts[s.selected]
+                self.frame_scene(Vec3(*v), self.radius)
+            else:
+                center, radius = s.center_and_radius()
+                self.frame_scene(center, radius)
+        elif symbol in self._NUDGE_MAP:
+            s.nudge(*self._NUDGE_MAP[symbol])
+        elif symbol == key.Z:
+            s.redo() if shift else s.undo()
+        elif symbol == key.E:
+            s.save_versioned() if shift else s.save()
+        elif symbol == key.S:
+            s.subdivide_down() if shift else s.subdivide_up()
+        elif symbol == key.M:
+            s.toggle_mirror()
+        elif symbol == key.C:
+            s.toggle_cage()
+        elif symbol == key.V:
+            s.toggle_surface_pts()
 
     def on_key_release(self, symbol: int, modifier: int) -> None:
         if symbol == key.ESCAPE:
@@ -170,8 +196,9 @@ class Control:
 
     def on_mouse_drag(self, x: int, y: int, dx: int, dy: int, button: int, modifier: int) -> None:
         if self.dragging_point is not None and self.scene is not None:
-            delta = self._drag_world_delta(self.dragging_point, dx, dy)
-            self.scene.move_point(self.dragging_point, delta)
+            p  = self.scene.cage_points()[self.dragging_point]
+            d = self._drag_world_delta(p, dx, dy)
+            self.scene.move_point(self.dragging_point, d)
         elif self.dragging_camera == "orbit":
             self._orbit(dx, dy)
         elif self.dragging_camera == "pan":

@@ -8,11 +8,9 @@
 """
 import argparse
 
-import pyglet
-
 from control import Control
 from render import RenderWindow
-from scene import BezierScene, BSplineScene, CatmullClarkScene, SceneManager
+from scene import BezierScene, BSplineScene, CatmullClarkScene
 
 
 def parse_args() -> argparse.Namespace:
@@ -45,10 +43,9 @@ if __name__ == "__main__":
 
     scene = build_scene(renderer, args)
     scene.load_references(args.ref)
-    scene_mgr = SceneManager(renderer, scene)
-    controller = Control(renderer, scene_manager=scene_mgr)
-    scene_mgr.controller = controller
-    scene_mgr.frame_initial()
+    controller = Control(renderer, scene=scene)
+    center, radius = scene.center_and_radius()
+    controller.frame_scene(center, radius)
 
     renderer.run()
 
