@@ -1,5 +1,5 @@
 STUDENTID = 2020-17316
-SUBMITFILE = PRJ1-2_$(STUDENTID)
+SUBMITFILE = PRJ1-3_$(STUDENTID)
 SPYTHON = python3.12
 VENV = .venv
 FILES = run.py grammar.lark requirements.txt \
