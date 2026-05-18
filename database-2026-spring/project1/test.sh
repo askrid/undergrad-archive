@@ -114,7 +114,6 @@ ${P}Create table has failed: foreign key references non primary key column"
 run_test_clean "PK columns auto NOT NULL" \
     "$(printf 'create table t (id int, name char(5), primary key(id));\nexplain t;')" \
     "${P}'t' table is created
-${P}
 ----------------------------------
 column_name | type    | null | key
 id          | int     | N    | PRI
@@ -163,7 +162,6 @@ run_test_clean "Explain with PK and FK" \
     "$(printf 'create table r (id int, primary key(id));\ncreate table t (a char(10), b int, primary key(a), foreign key(b) references r(id));\nexplain t;')" \
     "${P}'r' table is created
 ${P}'t' table is created
-${P}
 ----------------------------------
 column_name | type     | null | key
 a           | char(10) | N    | PRI
@@ -175,7 +173,6 @@ run_test_clean "Explain PRI/FOR column" \
     "$(printf 'create table r (id int, primary key(id));\ncreate table t (a int, primary key(a), foreign key(a) references r(id));\nexplain t;')" \
     "${P}'r' table is created
 ${P}'t' table is created
-${P}
 --------------------------------------
 column_name | type | null | key
 a           | int  | N    | PRI/FOR
@@ -197,7 +194,6 @@ run_test_clean "Desc NoSuchTable" \
 run_test_clean "Describe same as Explain" \
     "$(printf 'create table t (id int);\ndescribe t;')" \
     "${P}'t' table is created
-${P}
 ------------------------------
 column_name | type | null | key
 id          | int  | Y    |
@@ -207,7 +203,6 @@ id          | int  | Y    |
 run_test_clean "Desc same as Explain" \
     "$(printf 'create table t (id int);\ndesc t;')" \
     "${P}'t' table is created
-${P}
 ------------------------------
 column_name | type | null | key
 id          | int  | Y    |
@@ -221,8 +216,7 @@ echo "=== 4. SHOW TABLES ==="
 
 run_test_clean "Show tables empty" \
     "show tables;" \
-    "${P}
-------------------------
+    "------------------------
 ------------------------
 0 rows in set"
 
@@ -230,7 +224,6 @@ run_test_clean "Show tables with data" \
     "$(printf 'create table alpha (id int);\ncreate table beta (id int);\nshow tables;')" \
     "${P}'alpha' table is created
 ${P}'beta' table is created
-${P}
 ------------------------
 alpha
 beta
@@ -262,7 +255,6 @@ run_test_clean "Rename preserves data" \
     "${P}'t' table is created
 ${P}The row is inserted
 ${P}'s' is renamed
-${P}
 ----
 ID
 42
@@ -286,7 +278,6 @@ run_test_clean "Truncate success" \
     "${P}'t' table is created
 ${P}The row is inserted
 ${P}'t' is truncated
-${P}
 --
 ID
 --
@@ -320,7 +311,6 @@ run_test_clean "Insert with column list" \
     "$(printf 'create table t (id int, name char(10), age int);\ninsert into t (id, name) values(1, '"'"'Bob'"'"');\nselect * from t;')" \
     "${P}'t' table is created
 ${P}The row is inserted
-${P}
 -----------------
 ID | NAME | AGE
 1  | Bob  | null
@@ -331,7 +321,6 @@ run_test_clean "Insert char truncation" \
     "$(printf 'create table t (name char(3));\ninsert into t values('"'"'Hello'"'"');\nselect * from t;')" \
     "${P}'t' table is created
 ${P}The row is inserted
-${P}
 ----
 NAME
 Hel
@@ -346,7 +335,6 @@ echo "=== 8. SELECT ==="
 run_test_clean "Select empty table" \
     "$(printf 'create table t (id int, name char(5));\nselect * from t;')" \
     "${P}'t' table is created
-${P}
 -----------
 ID | NAME
 -----------
@@ -362,7 +350,6 @@ run_test_clean "Select with multiple rows" \
 ${P}The row is inserted
 ${P}The row is inserted
 ${P}The row is inserted
-${P}
 -----------
 ID | VAL
 1  | aaa
@@ -375,7 +362,6 @@ run_test_clean "Select null display" \
     "$(printf 'create table t (id int, name char(5));\ninsert into t (id) values(1);\nselect * from t;')" \
     "${P}'t' table is created
 ${P}The row is inserted
-${P}
 -----------
 ID | NAME
 1  | null
@@ -393,8 +379,7 @@ echo "$(printf 'create table t (id int, name char(5));\ninsert into t values(1, 
 # Second run: data should persist.
 run_test "Data persists across restarts" \
     "select * from t;" \
-    "${P}
------------
+"-----------
 ID | NAME
 1  | Hi
 -----------
@@ -408,7 +393,6 @@ echo "=== 10. Case insensitivity ==="
 run_test_clean "Table name case insensitive" \
     "$(printf 'CREATE TABLE MyTable (id int);\nshow tables;')" \
     "${P}'mytable' table is created
-${P}
 ------------------------
 mytable
 ------------------------
@@ -417,7 +401,6 @@ mytable
 run_test_clean "Column name case insensitive" \
     "$(printf 'create table t (MyCol int);\nexplain t;')" \
     "${P}'t' table is created
-${P}
 ------------------------------
 column_name | type | null | key
 mycol       | int  | Y    |

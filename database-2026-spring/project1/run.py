@@ -3,6 +3,7 @@ import lmdb
 import sys
 import os
 from concurrent.futures import Future
+from dataclasses import dataclass
 from threading import Thread
 from typing import Any, cast
 from lark import Lark, Token, Tree, UnexpectedInput, Transformer
@@ -113,24 +114,43 @@ class Database:
         return False
 
 
-def _fmt_table(headers: list[str], rows: list[list[str]]) -> str:
-    """Format tabular data with dashes, headers, rows, and row count."""
-    all_data: list[list[str]] = [headers] + rows
-    ncols = len(headers)
-    widths = [max(len(str(r[i])) for r in all_data) for i in range(ncols)]
+@dataclass
+class Result:
+    """Output of a transformed query.
+
+    `prompt` controls whether the shell PROMPT prefix is written before `text`.
+    """
+
+    text: str
+    prompt: bool = True
+
+
+def _fmt_table(
+    headers: list[str] | None,
+    rows: list[list[str]],
+    min_width: int = 0,
+) -> Result:
+    """Format tabular data with dashes, headers, rows, and row count.
+    """
+    sample = headers or (rows[0] if rows else [""])
+    ncols = len(sample)
+    sources: list[list[str]] = ([headers] if headers else []) + rows or [sample]
+    widths = [max(len(str(r[i])) for r in sources) for i in range(ncols)]
 
     def frow(r: list[str]) -> str:
         return " | ".join(str(r[i]).ljust(widths[i]) for i in range(ncols))
 
-    tw = sum(widths) + 3 * (ncols - 1)
+    tw = max(sum(widths) + 3 * (ncols - 1), min_width)
     dash = "-" * tw
-    lines = [dash, frow(headers)]
+    lines = [dash]
+    if headers:
+        lines.append(frow(headers))
     for r in rows:
         lines.append(frow(r))
     lines.append(dash)
     n = len(rows)
     lines.append(f"{n} row{'s' if n != 1 else ''} in set")
-    return "\n".join(lines)
+    return Result("\n".join(lines), prompt=False)
 
 
 def _strs(items: list[Any]) -> list[str]:
@@ -142,10 +162,8 @@ def _strs(items: list[Any]) -> list[str]:
 class SQLTransformer(Transformer):  # type: ignore[type-arg]
     """
     Transforms parsed SQL tree and executes queries against the LMDB-backed
-    database. The result is either a message string or None (EXIT).
+    database. The result is either a Result or None (EXIT).
     """
-
-    type Result = str | None
 
     def __init__(self, database: Database):
         super().__init__()
@@ -236,7 +254,7 @@ class SQLTransformer(Transformer):  # type: ignore[type-arg]
 
     # ---- DDL: CREATE TABLE ----
 
-    def create_table_query(self, items: list[Any]) -> str:
+    def create_table_query(self, items: list[Any]) -> Result:
         parts = [i for i in items if not isinstance(i, Token)]
         tname: str = parts[0]
         elems: list[dict[str, Any]] = parts[1]
@@ -249,22 +267,24 @@ class SQLTransformer(Transformer):  # type: ignore[type-arg]
         # CharLengthError
         for c in cols:
             if c["type"][0] == "char" and c["type"][1] <= 0:
-                return "Char length should be over 0"
+                return Result("Char length should be over 0")
 
         # DuplicateColumnDefError
         if len(cnames) != len(set(cnames)):
-            return "Create table has failed: column definition is duplicated"
+            return Result("Create table has failed: column definition is duplicated")
 
         # DuplicatePrimaryKeyDefError
         if len(pks) > 1:
-            return "Create table has failed: primary key definition is duplicated"
+            return Result(
+                "Create table has failed: primary key definition is duplicated"
+            )
 
         pk_cols: list[str] = pks[0]["cols"] if pks else []
 
         # PrimaryKeyColumnDefError
         for pc in pk_cols:
             if pc not in cnames:
-                return (
+                return Result(
                     f"Create table has failed:"
                     f"cannot define non-existing column '{pc}' as primary key"
                 )
@@ -273,19 +293,21 @@ class SQLTransformer(Transformer):  # type: ignore[type-arg]
         for fk in fks:
             for fc in fk["cols"]:
                 if fc not in cnames:
-                    return (
+                    return Result(
                         f"Create table has failed: "
                         f"cannot define non-existing column '{fc}' as foreign key"
                     )
 
         # TableExistenceError
         if self.db.has_table(tname):
-            return "Create table has failed: table with the same name already exists"
+            return Result(
+                "Create table has failed: table with the same name already exists"
+            )
 
         # ReferenceExistenceError
         for fk in fks:
             if not self.db.has_table(fk["ref"]):
-                return (
+                return Result(
                     "Create table has failed: "
                     "foreign key references non existing table or column"
                 )
@@ -293,7 +315,7 @@ class SQLTransformer(Transformer):  # type: ignore[type-arg]
             rc_names = [c["name"] for c in rs["columns"]]
             for rc in fk["rcols"]:
                 if rc not in rc_names:
-                    return (
+                    return Result(
                         "Create table has failed: "
                         "foreign key references non existing table or column"
                     )
@@ -305,8 +327,8 @@ class SQLTransformer(Transformer):  # type: ignore[type-arg]
             rt = {c["name"]: c["type"] for c in rs["columns"]}
             for fc, rc in zip(fk["cols"], fk["rcols"]):
                 if col_types[fc] != rt[rc]:
-                    return (
-                        "Create table has failed: " "foreign key references wrong type"
+                    return Result(
+                        "Create table has failed: foreign key references wrong type"
                     )
 
         # ReferenceNonPrimaryKeyError
@@ -314,7 +336,7 @@ class SQLTransformer(Transformer):  # type: ignore[type-arg]
             rs = self.db.get_schema(fk["ref"])
             rpk: list[str] = rs.get("primary_key", [])
             if sorted(fk["rcols"]) != sorted(rpk):
-                return (
+                return Result(
                     "Create table has failed: "
                     "foreign key references non primary key column"
                 )
@@ -336,22 +358,24 @@ class SQLTransformer(Transformer):  # type: ignore[type-arg]
             ],
         }
         self.db.create_table(tname, schema)
-        return f"'{tname}' table is created"
+        return Result(f"'{tname}' table is created")
 
     # ---- DDL: DROP TABLE ----
 
-    def drop_table_query(self, items: list[Any]) -> str:
+    def drop_table_query(self, items: list[Any]) -> Result:
         tname: str = _strs(items)[0]
         if not self.db.has_table(tname):
-            return "Drop table has failed: no such table"
+            return Result("Drop table has failed: no such table")
         if self.db.is_referenced(tname):
-            return f"Drop table has failed: '{tname}' is referenced by another table"
+            return Result(
+                f"Drop table has failed: '{tname}' is referenced by another table"
+            )
         self.db.drop_table(tname)
-        return f"'{tname}' table is dropped"
+        return Result(f"'{tname}' table is dropped")
 
     # ---- DDL: EXPLAIN / DESCRIBE / DESC ----
 
-    def _explain(self, tname: str) -> str:
+    def _explain(self, tname: str) -> Result:
         s = self.db.get_schema(tname)
         pk = set(s.get("primary_key", []))
         fk_set: set[str] = set()
@@ -371,71 +395,68 @@ class SQLTransformer(Transformer):  # type: ignore[type-arg]
             if c["name"] in fk_set:
                 kp.append("FOR")
             rows.append([c["name"], tp, nl, "/".join(kp)])
+        # Metadata describe output is printed without the PROMPT prefix.
         return _fmt_table(hdrs, rows)
 
-    def explain_query(self, items: list[Any]) -> str:
+    def explain_query(self, items: list[Any]) -> Result:
         t: str = _strs(items)[0]
         if not self.db.has_table(t):
-            return "Explain has failed: no such table"
+            return Result("Explain has failed: no such table")
         return self._explain(t)
 
-    def describe_query(self, items: list[Any]) -> str:
+    def describe_query(self, items: list[Any]) -> Result:
         t: str = _strs(items)[0]
         if not self.db.has_table(t):
-            return "Describe has failed: no such table"
+            return Result("Describe has failed: no such table")
         return self._explain(t)
 
-    def desc_query(self, items: list[Any]) -> str:
+    def desc_query(self, items: list[Any]) -> Result:
         t: str = _strs(items)[0]
         if not self.db.has_table(t):
-            return "Desc has failed: no such table"
+            return Result("Desc has failed: no such table")
         return self._explain(t)
 
     # ---- DDL: SHOW TABLES ----
 
-    def show_tables_query(self, items: list[Any]) -> str:
-        tables = self.db.get_tables()
-        d = "------------------------"
-        lines = [d] + tables + [d]
-        n = len(tables)
-        lines.append(f"{n} row{'s' if n != 1 else ''} in set")
-        return "\n".join(lines)
+    def show_tables_query(self, items: list[Any]) -> Result:
+        rows = [[t] for t in self.db.get_tables()]
+        return _fmt_table(None, rows, min_width=24)
 
     # ---- DDL: RENAME TABLE ----
 
-    def rename_table_query(self, items: list[Any]) -> str:
+    def rename_table_query(self, items: list[Any]) -> Result:
         names = _strs(items)
         old, new = names[0], names[1]
         if not self.db.has_table(old):
-            return "Rename table has failed: no such table"
+            return Result("Rename table has failed: no such table")
         if self.db.has_table(new):
-            return (
-                f"Rename table has failed: " f"there is already a table named '{new}'"
+            return Result(
+                f"Rename table has failed: there is already a table named '{new}'"
             )
         self.db.rename_table(old, new)
-        return f"'{new}' is renamed"
+        return Result(f"'{new}' is renamed")
 
     # ---- DDL: TRUNCATE TABLE ----
 
-    def truncate_table_query(self, items: list[Any]) -> str:
+    def truncate_table_query(self, items: list[Any]) -> Result:
         t: str = _strs(items)[0]
         if not self.db.has_table(t):
-            return "Truncate table has failed: no such table"
+            return Result("Truncate table has failed: no such table")
         if self.db.is_referenced(t):
-            return (
-                f"Truncate table has failed: " f"'{t}' is referenced by another table"
+            return Result(
+                f"Truncate table has failed: '{t}' is referenced by another table"
             )
         self.db.clear_rows(t)
-        return f"'{t}' is truncated"
+        return Result(f"'{t}' is truncated")
 
     # ---- DML: INSERT ----
 
-    def insert_query(self, items: list[Any]) -> str:
+    def insert_query(self, items: list[Any]) -> Result:
         parts = [i for i in items if not isinstance(i, Token)]
         tname: str = parts[0]
 
         if not self.db.has_table(tname):
-            return "Insert has failed: no such table"
+            return Result("Insert has failed: no such table")
 
         schema = self.db.get_schema(tname)
         columns: list[dict[str, Any]] = schema["columns"]
@@ -465,17 +486,17 @@ class SQLTransformer(Transformer):  # type: ignore[type-arg]
                     row[i] = row[i][:ml]
 
         self.db.add_row(tname, row)
-        return "The row is inserted"
+        return Result("The row is inserted")
 
     # ---- DML: SELECT ----
 
-    def select_query(self, items: list[Any]) -> str:
+    def select_query(self, items: list[Any]) -> Result:
         parts = [i for i in items if not isinstance(i, Token)]
         tables: list[str] = parts[1]
         tname = tables[0]
 
         if not self.db.has_table(tname):
-            return f"Select has failed: '{tname}' does not exist"
+            return Result(f"Select has failed: '{tname}' does not exist")
 
         schema = self.db.get_schema(tname)
         hdrs = [c["name"].upper() for c in schema["columns"]]
@@ -487,22 +508,22 @@ class SQLTransformer(Transformer):  # type: ignore[type-arg]
 
     # ---- Unimplemented (pass-through for future projects) ----
 
-    def delete_query(self, _: list[Any]) -> str:
-        return "'DELETE' requested"
+    def delete_query(self, _: list[Any]) -> Result:
+        return Result("'DELETE' requested")
 
-    def update_query(self, _: list[Any]) -> str:
-        return "'UPDATE' requested"
+    def update_query(self, _: list[Any]) -> Result:
+        return Result("'UPDATE' requested")
 
     # ---- Control ----
 
     def exit_query(self, _: list[Any]) -> None:
         return None
 
-    def query(self, args: list[Result]) -> Result:
+    def query(self, args: "list[Result | None]") -> "Result | None":
         assert len(args) == 1
         return args[0]
 
-    def command(self, args: list[Result]) -> Result:
+    def command(self, args: "list[Result | None]") -> "Result | None":
         assert len(args) == 1
         return args[0]
 
@@ -555,14 +576,12 @@ def process_seq(*seq: str) -> bool:
     for s in seq:
         try:
             tree: Tree[Token] = parser.parse(s)
-            res = cast(SQLTransformer.Result, transformer.transform(tree))
+            res = cast("Result | None", transformer.transform(tree))
             if res is None:
                 return True
-            # Multi-line results get newline after prompt.
-            if "\n" in res:
-                sys.stdout.write(PROMPT + "\n" + res + "\n")
-            else:
-                sys.stdout.write(PROMPT + res + "\n")
+            out = PROMPT if res.prompt else ""
+            out += res.text + "\n"
+            sys.stdout.write(out)
         except UnexpectedInput:
             sys.stdout.write(PROMPT + "Syntax error\n")
             break  # Stop after failure.
