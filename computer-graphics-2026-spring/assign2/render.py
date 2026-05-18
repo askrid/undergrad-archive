@@ -1,7 +1,7 @@
 """Pyglet window: batch, lighting uniforms, GL setup, shape adders."""
 from __future__ import annotations
 
-from typing import List, Sequence, Tuple
+from typing import List, Sequence
 
 import pyglet
 from pyglet.gl import *
@@ -26,7 +26,7 @@ class RenderWindow(pyglet.window.Window):
         self.view_mat: Mat4 = Mat4()
         self.proj_mat: Mat4 = Mat4()
 
-        self.shapes: List[Tuple[object, object]] = []
+        self.groups: List[object] = []
 
         # Single point light, world space.
         self.light_pos: Vec3 = Vec3(4, 6, 6)
@@ -54,7 +54,7 @@ class RenderWindow(pyglet.window.Window):
 
     def _push_uniforms(self) -> None:
         view_proj = self.proj_mat @ self.view_mat
-        for group, _ in self.shapes:
+        for group in self.groups:
             prog = group.shader_program
             prog.use()
             prog["view_proj"] = view_proj
@@ -86,44 +86,41 @@ class RenderWindow(pyglet.window.Window):
     # ---------- Shape adders ----------
 
     def _next_order(self) -> int:
-        return len(self.shapes)
+        return len(self.groups)
 
     def add_lines(self, transform: Mat4, vertices: Sequence[float],
                   indices: Sequence[int], colors: Sequence[int]) -> FlatGroup:
         group = FlatGroup(transform, self._next_order())
-        vlist = group.shader_program.vertex_list_indexed(
+        group.indexed_vertices_list = group.shader_program.vertex_list_indexed(
             len(vertices) // 3, GL_LINES,
             batch=self.batch, group=group, indices=indices,
             vertices=("f", vertices), colors=("Bn", colors),
         )
-        group.indexed_vertices_list = vlist
-        self.shapes.append((group, vlist))
+        self.groups.append(group)
         return group
 
     def add_points(self, transform: Mat4, vertices: Sequence[float],
                    colors: Sequence[int]) -> FlatGroup:
         # Points: always on top so cage handles stay clickable.
         group = FlatGroup(transform, order=1_000_000, depth_test=False)
-        vlist = group.shader_program.vertex_list(
+        group.indexed_vertices_list = group.shader_program.vertex_list(
             len(vertices) // 3, GL_POINTS,
             batch=self.batch, group=group,
             vertices=("f", vertices), colors=("Bn", colors),
         )
-        group.indexed_vertices_list = vlist
-        self.shapes.append((group, vlist))
+        self.groups.append(group)
         return group
 
     def add_mesh(self, transform: Mat4, vertices: Sequence[float],
                  indices: Sequence[int], colors: Sequence[int],
                  normals: Sequence[float]) -> LitGroup:
         group = LitGroup(transform, self._next_order())
-        vlist = group.shader_program.vertex_list_indexed(
+        group.indexed_vertices_list = group.shader_program.vertex_list_indexed(
             len(vertices) // 3, GL_TRIANGLES,
             batch=self.batch, group=group, indices=indices,
             vertices=("f", vertices), colors=("Bn", colors), normals=("f", normals),
         )
-        group.indexed_vertices_list = vlist
-        self.shapes.append((group, vlist))
+        self.groups.append(group)
         return group
 
     def add_flat_triangles(self, transform: Mat4, vertices: Sequence[float],
@@ -131,39 +128,33 @@ class RenderWindow(pyglet.window.Window):
                            order: int = 500_000) -> FlatGroup:
         """Unlit triangles for overlays."""
         group = FlatGroup(transform, order)
-        vlist = group.shader_program.vertex_list_indexed(
+        group.indexed_vertices_list = group.shader_program.vertex_list_indexed(
             len(vertices) // 3, GL_TRIANGLES,
             batch=self.batch, group=group, indices=indices,
             vertices=("f", vertices), colors=("Bn", colors),
         )
-        group.indexed_vertices_list = vlist
-        self.shapes.append((group, vlist))
+        self.groups.append(group)
         return group
 
     def replace_mesh_vlist(self, group: LitGroup, vertices: Sequence[float],
                            indices: Sequence[int], colors: Sequence[int],
                            normals: Sequence[float]) -> None:
         """Swap vlist on an existing group (avoids shader recompile)."""
-        old = group.indexed_vertices_list
-        if old is not None:
-            old.delete()
-        vlist = group.shader_program.vertex_list_indexed(
+        if group.indexed_vertices_list is not None:
+            group.indexed_vertices_list.delete()
+        group.indexed_vertices_list = group.shader_program.vertex_list_indexed(
             len(vertices) // 3, GL_TRIANGLES,
             batch=self.batch, group=group, indices=indices,
             vertices=("f", vertices), colors=("Bn", colors), normals=("f", normals),
         )
-        group.indexed_vertices_list = vlist
-        for i, (g, _) in enumerate(self.shapes):
-            if g is group:
-                self.shapes[i] = (group, vlist)
-                return
-        self.shapes.append((group, vlist))
+        if group not in self.groups:
+            self.groups.append(group)
 
     def remove_group(self, group: object) -> None:
-        for i, (g, vlist) in enumerate(self.shapes):
+        for i, g in enumerate(self.groups):
             if g is group:
-                vlist.delete()
-                self.shapes.pop(i)
+                g.indexed_vertices_list.delete()
+                self.groups.pop(i)
                 return
 
     def run(self) -> None:
