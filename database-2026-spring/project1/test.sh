@@ -253,10 +253,10 @@ ${P}Rename table has failed: there is already a table named 's'"
 run_test_clean "Rename preserves data" \
     "$(printf 'create table t (id int);\ninsert into t values(42);\nrename table t to s;\nselect * from s;')" \
     "${P}'t' table is created
-${P}The row is inserted
+${P}1 row inserted
 ${P}'s' is renamed
 ----
-ID
+id
 42
 ----
 1 row in set"
@@ -276,10 +276,10 @@ echo "=== 6. TRUNCATE TABLE ==="
 run_test_clean "Truncate success" \
     "$(printf 'create table t (id int);\ninsert into t values(1);\ntruncate table t;\nselect * from t;')" \
     "${P}'t' table is created
-${P}The row is inserted
+${P}1 row inserted
 ${P}'t' is truncated
 --
-ID
+id
 --
 0 rows in set"
 
@@ -301,7 +301,7 @@ echo "=== 7. INSERT ==="
 run_test_clean "Insert success" \
     "$(printf 'create table t (id int, name char(10));\ninsert into t values(1, '"'"'Alice'"'"');')" \
     "${P}'t' table is created
-${P}The row is inserted"
+${P}1 row inserted"
 
 run_test_clean "Insert NoSuchTable" \
     "insert into t values(1);" \
@@ -310,9 +310,9 @@ run_test_clean "Insert NoSuchTable" \
 run_test_clean "Insert with column list" \
     "$(printf 'create table t (id int, name char(10), age int);\ninsert into t (id, name) values(1, '"'"'Bob'"'"');\nselect * from t;')" \
     "${P}'t' table is created
-${P}The row is inserted
+${P}1 row inserted
 -----------------
-ID | NAME | AGE
+id | name | age
 1  | Bob  | null
 -----------------
 1 row in set"
@@ -320,9 +320,9 @@ ID | NAME | AGE
 run_test_clean "Insert char truncation" \
     "$(printf 'create table t (name char(3));\ninsert into t values('"'"'Hello'"'"');\nselect * from t;')" \
     "${P}'t' table is created
-${P}The row is inserted
+${P}1 row inserted
 ----
-NAME
+name
 Hel
 ----
 1 row in set"
@@ -336,7 +336,7 @@ run_test_clean "Select empty table" \
     "$(printf 'create table t (id int, name char(5));\nselect * from t;')" \
     "${P}'t' table is created
 -----------
-ID | NAME
+id | name
 -----------
 0 rows in set"
 
@@ -347,11 +347,11 @@ run_test_clean "SelectTableExistenceError" \
 run_test_clean "Select with multiple rows" \
     "$(printf 'create table t (id int, val char(5));\ninsert into t values(1, '"'"'aaa'"'"');\ninsert into t values(2, '"'"'bbb'"'"');\ninsert into t values(3, '"'"'ccc'"'"');\nselect * from t;')" \
     "${P}'t' table is created
-${P}The row is inserted
-${P}The row is inserted
-${P}The row is inserted
+${P}1 row inserted
+${P}1 row inserted
+${P}1 row inserted
 -----------
-ID | VAL
+id | val
 1  | aaa
 2  | bbb
 3  | ccc
@@ -361,9 +361,9 @@ ID | VAL
 run_test_clean "Select null display" \
     "$(printf 'create table t (id int, name char(5));\ninsert into t (id) values(1);\nselect * from t;')" \
     "${P}'t' table is created
-${P}The row is inserted
+${P}1 row inserted
 -----------
-ID | NAME
+id | name
 1  | null
 -----------
 1 row in set"
@@ -380,7 +380,7 @@ echo "$(printf 'create table t (id int, name char(5));\ninsert into t values(1, 
 run_test "Data persists across restarts" \
     "select * from t;" \
 "-----------
-ID | NAME
+id | name
 1  | Hi
 -----------
 1 row in set"
@@ -439,16 +439,293 @@ run_test_clean "Queries before exit run" \
 
 # ============================================================
 echo ""
-echo "=== 13. DELETE / UPDATE pass-through ==="
+echo "=== 13. INSERT errors (1-3) ==="
 # ============================================================
 
-run_test_clean "DELETE pass-through" \
-    "DELETE FROM t;" \
-    "${P}'DELETE' requested"
+run_test_clean "Insert NoSuchTable" \
+    "insert into nope values(1);" \
+    "${P}Insert has failed: no such table"
 
-run_test_clean "UPDATE pass-through" \
-    "UPDATE t SET x = 5;" \
-    "${P}'UPDATE' requested"
+run_test_clean "Insert column does not exist" \
+    "$(printf 'create table t (id int);\ninsert into t (bogus) values(1);')" \
+    "${P}'t' table is created
+${P}Insert has failed: 'bogus' does not exist"
+
+run_test_clean "Insert type mismatch (length)" \
+    "$(printf 'create table t (a int, b int);\ninsert into t values(1);')" \
+    "${P}'t' table is created
+${P}Insert has failed: types are not matched"
+
+run_test_clean "Insert type mismatch (type)" \
+    "$(printf 'create table t (a int);\ninsert into t values('"'"'oops'"'"');')" \
+    "${P}'t' table is created
+${P}Insert has failed: types are not matched"
+
+run_test_clean "Insert null into NOT NULL (PK)" \
+    "$(printf 'create table t (id int, primary key(id));\ninsert into t (id) values(null);')" \
+    "${P}'t' table is created
+${P}Insert has failed: 'id' is not nullable"
+
+# ============================================================
+echo ""
+echo "=== 14. DELETE (1-3) ==="
+# ============================================================
+
+run_test_clean "Delete no such table" \
+    "delete from nope;" \
+    "${P}Delete has failed: no such table"
+
+run_test_clean "Delete all (no WHERE)" \
+    "$(printf 'create table t (id int);\ninsert into t values(1);\ninsert into t values(2);\ndelete from t;\nselect * from t;')" \
+    "${P}'t' table is created
+${P}1 row inserted
+${P}1 row inserted
+${P}'2' row(s) deleted
+--
+id
+--
+0 rows in set"
+
+run_test_clean "Delete with WHERE" \
+    "$(printf 'create table t (id int, name char(5));\ninsert into t values(1, '"'"'a'"'"');\ninsert into t values(2, '"'"'b'"'"');\ndelete from t where id = 1;\nselect * from t;')" \
+    "${P}'t' table is created
+${P}1 row inserted
+${P}1 row inserted
+${P}'1' row(s) deleted
+-----------
+id | name
+2  | b
+-----------
+1 row in set"
+
+run_test_clean "Delete referential integrity blocked" \
+    "$(printf 'create table r (id int, primary key(id));\ncreate table t (fk int, foreign key(fk) references r(id));\ninsert into r values(1);\ninsert into t values(1);\ndelete from r;\nselect * from r;')" \
+    "${P}'r' table is created
+${P}'t' table is created
+${P}1 row inserted
+${P}1 row inserted
+${P}'1' row(s) are not deleted due to referential integrity
+----
+id
+1
+----
+1 row in set"
+
+# ============================================================
+echo ""
+echo "=== 15. SELECT projection + WHERE (1-3) ==="
+# ============================================================
+
+run_test_clean "Select single column" \
+    "$(printf 'create table t (id int, name char(5));\ninsert into t values(1, '"'"'a'"'"');\nselect id from t;')" \
+    "${P}'t' table is created
+${P}1 row inserted
+--
+id
+1
+--
+1 row in set"
+
+run_test_clean "Select WHERE equality" \
+    "$(printf 'create table t (id int);\ninsert into t values(1);\ninsert into t values(2);\nselect * from t where id = 2;')" \
+    "${P}'t' table is created
+${P}1 row inserted
+${P}1 row inserted
+--
+id
+2
+--
+1 row in set"
+
+run_test_clean "Select WHERE incomparable" \
+    "$(printf 'create table t (a int);\ninsert into t values(1);\nselect * from t where a = '"'"'x'"'"';')" \
+    "${P}'t' table is created
+${P}1 row inserted
+${P}Trying to compare incomparable columns or values"
+
+run_test_clean "Select WHERE column not exist" \
+    "$(printf 'create table t (a int);\nselect * from t where nope = 1;')" \
+    "${P}'t' table is created
+${P}where clause trying to reference non existing column"
+
+run_test_clean "Select WHERE table not specified" \
+    "$(printf 'create table t (a int);\nselect * from t where other.a = 1;')" \
+    "${P}'t' table is created
+${P}where clause trying to reference tables which are not specified"
+
+run_test_clean "Select WHERE IS NULL" \
+    "$(printf 'create table t (id int, name char(5));\ninsert into t (id) values(1);\nselect * from t where name is null;')" \
+    "${P}'t' table is created
+${P}1 row inserted
+-----------
+id | name
+1  | null
+-----------
+1 row in set"
+
+# ============================================================
+echo ""
+echo "=== 16. SELECT JOIN (1-3) ==="
+# ============================================================
+
+run_test_clean "Inner join two tables" \
+    "$(printf 'create table r (id int, primary key(id));\ncreate table t (fk int, foreign key(fk) references r(id));\ninsert into r values(1);\ninsert into r values(2);\ninsert into t values(1);\nselect r.id, t.fk from r join t on r.id = t.fk;')" \
+    "${P}'r' table is created
+${P}'t' table is created
+${P}1 row inserted
+${P}1 row inserted
+${P}1 row inserted
+-----------
+r.id | t.fk
+1    | 1
+-----------
+1 row in set"
+
+run_test_clean "Join ambiguous unqualified column" \
+    "$(printf 'create table a (x int);\ncreate table b (x int);\ninsert into a values(1);\ninsert into b values(1);\nselect x from a join b on a.x = b.x;')" \
+    "${P}'a' table is created
+${P}'b' table is created
+${P}1 row inserted
+${P}1 row inserted
+${P}Select has failed: fail to resolve 'x'"
+
+# ============================================================
+echo ""
+echo "=== 17. ORDER BY / LIMIT / OFFSET (1-3) ==="
+# ============================================================
+
+run_test_clean "Order by asc" \
+    "$(printf 'create table t (id int);\ninsert into t values(3);\ninsert into t values(1);\ninsert into t values(2);\nselect * from t order by id asc;')" \
+    "${P}'t' table is created
+${P}1 row inserted
+${P}1 row inserted
+${P}1 row inserted
+--
+id
+1
+2
+3
+--
+3 rows in set"
+
+run_test_clean "Order by desc" \
+    "$(printf 'create table t (id int);\ninsert into t values(1);\ninsert into t values(3);\ninsert into t values(2);\nselect * from t order by id desc;')" \
+    "${P}'t' table is created
+${P}1 row inserted
+${P}1 row inserted
+${P}1 row inserted
+--
+id
+3
+2
+1
+--
+3 rows in set"
+
+run_test_clean "Limit and offset" \
+    "$(printf 'create table t (id int);\ninsert into t values(1);\ninsert into t values(2);\ninsert into t values(3);\ninsert into t values(4);\nselect * from t order by id asc limit 2 offset 1;')" \
+    "${P}'t' table is created
+${P}1 row inserted
+${P}1 row inserted
+${P}1 row inserted
+${P}1 row inserted
+--
+id
+2
+3
+--
+2 rows in set"
+
+run_test_clean "Negative limit error" \
+    "$(printf 'create table t (id int);\nselect * from t limit -1;')" \
+    "${P}'t' table is created
+${P}Select has failed: LIMIT/OFFSET clause should be a non-negative integer"
+
+# ============================================================
+echo ""
+echo "=== 18. GROUP BY + aggregates (optional) ==="
+# ============================================================
+
+run_test_clean "MAX with GROUP BY" \
+    "$(printf 'create table t (g char(1), v int);\ninsert into t values('"'"'a'"'"', 5);\ninsert into t values('"'"'a'"'"', 9);\ninsert into t values('"'"'b'"'"', 3);\nselect g, max(v) from t group by g order by g asc;')" \
+    "${P}'t' table is created
+${P}1 row inserted
+${P}1 row inserted
+${P}1 row inserted
+----------
+g | max(v)
+a | 9
+b | 3
+----------
+2 rows in set"
+
+run_test_clean "MIN with GROUP BY" \
+    "$(printf 'create table t (g char(1), v int);\ninsert into t values('"'"'a'"'"', 5);\ninsert into t values('"'"'a'"'"', 9);\ninsert into t values('"'"'b'"'"', 3);\nselect g, min(v) from t group by g order by g asc;')" \
+    "${P}'t' table is created
+${P}1 row inserted
+${P}1 row inserted
+${P}1 row inserted
+----------
+g | min(v)
+a | 5
+b | 3
+----------
+2 rows in set"
+
+run_test_clean "SUM with GROUP BY" \
+    "$(printf 'create table t (g char(1), v int);\ninsert into t values('"'"'a'"'"', 5);\ninsert into t values('"'"'a'"'"', 9);\ninsert into t values('"'"'b'"'"', 3);\nselect g, sum(v) from t group by g order by g asc;')" \
+    "${P}'t' table is created
+${P}1 row inserted
+${P}1 row inserted
+${P}1 row inserted
+----------
+g | sum(v)
+a | 14
+b | 3
+----------
+2 rows in set"
+
+run_test_clean "Aggregate without GROUP BY (single group)" \
+    "$(printf 'create table t (v int);\ninsert into t values(10);\ninsert into t values(20);\nselect max(v) from t;')" \
+    "${P}'t' table is created
+${P}1 row inserted
+${P}1 row inserted
+------
+max(v)
+20
+------
+1 row in set"
+
+run_test_clean "SelectColumnNotGrouped" \
+    "$(printf 'create table t (a int, b int);\ninsert into t values(1, 10);\nselect a, b from t group by a;')" \
+    "${P}'t' table is created
+${P}1 row inserted
+${P}Select has failed: column 'b' must either be included in the GROUP BY clause or be used in an aggregate function"
+
+run_test_clean "MAX returns null on empty / all-null" \
+    "$(printf 'create table t (v int);\ninsert into t values(null);\nselect max(v) from t;')" \
+    "${P}'t' table is created
+${P}1 row inserted
+------
+max(v)
+null
+------
+1 row in set"
+
+run_test_clean "SUM returns 0 on empty / all-null" \
+    "$(printf 'create table t (v int);\ninsert into t values(null);\nselect sum(v) from t;')" \
+    "${P}'t' table is created
+${P}1 row inserted
+------
+sum(v)
+0
+------
+1 row in set"
+
+run_test_clean "GROUP BY column not exist" \
+    "$(printf 'create table t (a int);\nselect a from t group by nope;')" \
+    "${P}'t' table is created
+${P}group by clause trying to reference non existing column"
 
 # ============================================================
 echo ""

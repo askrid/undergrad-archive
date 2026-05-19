@@ -101,6 +101,9 @@ class Database:
     def clear_rows(self, name: str) -> None:
         self._put(f"data:{name}", [])
 
+    def set_rows(self, name: str, rows: list[list[Any]]) -> None:
+        self._put(f"data:{name}", rows)
+
     def is_referenced(self, name: str) -> bool:
         """Check if any other existing table has FK referencing this table."""
         for t in self.get_tables():
@@ -130,8 +133,7 @@ def _fmt_table(
     rows: list[list[str]],
     min_width: int = 0,
 ) -> Result:
-    """Format tabular data with dashes, headers, rows, and row count.
-    """
+    """Format tabular data with dashes, headers, rows, and row count."""
     sample = headers or (rows[0] if rows else [""])
     ncols = len(sample)
     sources: list[list[str]] = ([headers] if headers else []) + rows or [sample]
@@ -157,6 +159,211 @@ def _strs(items: list[Any]) -> list[str]:
     """Extract plain strings (transformed rule results) from items,
     filtering out Token objects (which are str subclass)."""
     return [i for i in items if isinstance(i, str) and not isinstance(i, Token)]
+
+
+# Sentinel for SELECT *.
+SELECT_STAR = "*"
+
+
+class _QueryError(Exception):
+    """Recoverable semantic error during query execution, translated to a
+    message string at the top of the SELECT / DELETE handler."""
+
+    def __init__(self, code: str, **info: Any):
+        super().__init__(code)
+        self.code = code
+        self.info = info
+
+
+def _col_type(t: list[Any]) -> str:
+    return t[0]
+
+
+def _can_compare(t1: str, t2: str, op: str) -> bool:
+    if t1 == "null" or t2 == "null":
+        return False
+    if t1 != t2:
+        return False
+    if op in ("=", "!="):
+        return True
+    return t1 in ("int", "date")
+
+
+def _resolve_column(
+    ref: dict[str, Any],
+    scope: list[dict[str, Any]],
+    clause: str,
+) -> dict[str, Any]:
+    """Bind a column reference to a FROM entry; raise _QueryError otherwise.
+    Returned shape: {"alias", "col", "type"}."""
+    t = ref.get("t")
+    c = ref["c"]
+    if t is not None:
+        entries = [e for e in scope if e["alias"] == t]
+        if not entries:
+            raise _QueryError("TABLE_NOT_SPECIFIED", clause=clause)
+        for cs in entries[0]["schema"]["columns"]:
+            if cs["name"] == c:
+                return {"alias": t, "col": c, "type": _col_type(cs["type"])}
+        raise _QueryError("COLUMN_NOT_EXIST", clause=clause)
+    matches: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for e in scope:
+        for cs in e["schema"]["columns"]:
+            if cs["name"] == c:
+                matches.append((e, cs))
+    if not matches:
+        raise _QueryError("COLUMN_NOT_EXIST", clause=clause)
+    if len(matches) > 1:
+        raise _QueryError("AMBIGUOUS", clause=clause)
+    e, cs = matches[0]
+    return {"alias": e["alias"], "col": c, "type": _col_type(cs["type"])}
+
+
+def _bind_operand(
+    op: dict[str, Any],
+    scope: list[dict[str, Any]],
+    clause: str,
+) -> dict[str, Any]:
+    if op["k"] == "val":
+        return op
+    bound = _resolve_column({"t": op.get("t"), "c": op["c"]}, scope, clause)
+    return {"k": "col", **bound}
+
+
+def _bind_expr(
+    ast: dict[str, Any] | None,
+    scope: list[dict[str, Any]],
+    clause: str,
+) -> dict[str, Any] | None:
+    """Resolve column refs and validate comparison compatibility."""
+    if ast is None:
+        return None
+    k = ast["k"]
+    if k in ("and", "or"):
+        return {
+            "k": k,
+            "a": _bind_expr(ast["a"], scope, clause),
+            "b": _bind_expr(ast["b"], scope, clause),
+        }
+    if k == "not":
+        return {"k": "not", "x": _bind_expr(ast["x"], scope, clause)}
+    if k == "is_null":
+        return {
+            "k": "is_null",
+            "col": _resolve_column(ast["col"], scope, clause),
+            "negated": ast["negated"],
+        }
+    if k == "cmp":
+        lhs = _bind_operand(ast["lhs"], scope, clause)
+        rhs = _bind_operand(ast["rhs"], scope, clause)
+        lt = lhs["type"] if lhs["k"] == "col" else lhs["t"]
+        rt = rhs["type"] if rhs["k"] == "col" else rhs["t"]
+        if not _can_compare(lt, rt, ast["op"]):
+            raise _QueryError("INCOMPARABLE")
+        return {"k": "cmp", "lhs": lhs, "rhs": rhs, "op": ast["op"]}
+    raise ValueError(f"Unknown AST node: {ast}")
+
+
+def _operand_val(op: dict[str, Any], env: dict[tuple[str, str], Any]) -> Any:
+    if op["k"] == "val":
+        return op["v"]
+    return env[(op["alias"], op["col"])]
+
+
+def _eval_expr(
+    ast: dict[str, Any] | None,
+    env: dict[tuple[str, str], Any],
+) -> bool | None:
+    """Three-valued logic. None for WHERE-absent matches everything."""
+    if ast is None:
+        return True
+    k = ast["k"]
+    if k == "and":
+        a = _eval_expr(ast["a"], env)
+        b = _eval_expr(ast["b"], env)
+        if a is False or b is False:
+            return False
+        if a is None or b is None:
+            return None
+        return True
+    if k == "or":
+        a = _eval_expr(ast["a"], env)
+        b = _eval_expr(ast["b"], env)
+        if a is True or b is True:
+            return True
+        if a is None or b is None:
+            return None
+        return False
+    if k == "not":
+        x = _eval_expr(ast["x"], env)
+        return None if x is None else not x
+    if k == "is_null":
+        v = env[(ast["col"]["alias"], ast["col"]["col"])]
+        is_null = v is None
+        return (not is_null) if ast["negated"] else is_null
+    if k == "cmp":
+        lv = _operand_val(ast["lhs"], env)
+        rv = _operand_val(ast["rhs"], env)
+        if lv is None or rv is None:
+            return None
+        op = ast["op"]
+        return {
+            "=": lv == rv,
+            "!=": lv != rv,
+            "<": lv < rv,
+            "<=": lv <= rv,
+            ">": lv > rv,
+            ">=": lv >= rv,
+        }[op]
+    raise ValueError(f"Unknown AST node: {ast}")
+
+
+def _scope_entry(name: str, alias: str, schema: dict[str, Any]) -> dict[str, Any]:
+    return {"name": name, "alias": alias, "schema": schema}
+
+
+def _row_env(entry: dict[str, Any], row: list[Any]) -> dict[tuple[str, str], Any]:
+    alias = entry["alias"]
+    return {
+        (alias, c["name"]): row[i] for i, c in enumerate(entry["schema"]["columns"])
+    }
+
+
+def _aggregate(fn: str, vals: list[Any]) -> Any:
+    """MAX/MIN return None on empty or all-null input.
+    SUM returns 0 on empty / all-null / non-int values."""
+    non_null = [v for v in vals if v is not None]
+    if fn == "max":
+        return max(non_null) if non_null else None
+    if fn == "min":
+        return min(non_null) if non_null else None
+    if fn == "sum":
+        ints = [v for v in non_null if isinstance(v, int) and not isinstance(v, bool)]
+        return sum(ints) if ints else 0
+    raise ValueError(f"Unknown aggregate: {fn}")
+
+
+def _msg_for(e: _QueryError) -> Result:
+    clause = e.info.get("clause", "")
+    if e.code == "TABLE_NOT_SPECIFIED":
+        return Result(
+            f"{clause} clause trying to reference tables which are not specified"
+        )
+    if e.code == "COLUMN_NOT_EXIST":
+        return Result(f"{clause} clause trying to reference non existing column")
+    if e.code == "AMBIGUOUS":
+        return Result(f"{clause} clause contains ambiguous column reference")
+    if e.code == "INCOMPARABLE":
+        return Result("Trying to compare incomparable columns or values")
+    if e.code == "INVALID_LIMIT_OFFSET":
+        return Result(
+            "Select has failed: LIMIT/OFFSET clause should be a non-negative integer"
+        )
+    if e.code == "SELECT_COL_RESOLVE":
+        return Result(f"Select has failed: fail to resolve '{e.info.get('col', '')}'")
+    if e.code == "SELECT_TABLE_NOT_EXIST":
+        return Result(f"Select has failed: '{e.info.get('table', '')}' does not exist")
+    raise ValueError(f"Unhandled query error code: {e.code}")
 
 
 class SQLTransformer(Transformer):  # type: ignore[type-arg]
@@ -212,45 +419,198 @@ class SQLTransformer(Transformer):  # type: ignore[type-arg]
     def table_element_list(self, items: list[Any]) -> list[dict[str, Any]]:
         return [i for i in items if isinstance(i, dict)]
 
-    def value(self, items: list[Token]) -> int | str | None:
+    def value(self, items: list[Token]) -> dict[str, Any]:
         t = items[0]
         if t.type == "INT":
-            return int(str(t))
-        elif t.type == "STR":
-            return str(t)[1:-1]
-        elif t.type == "DATE":
-            return str(t)
-        elif t.type == "NULL":
-            return None
+            return {"v": int(str(t)), "t": "int"}
+        if t.type == "STR":
+            return {"v": str(t)[1:-1], "t": "char"}
+        if t.type == "DATE":
+            return {"v": str(t), "t": "date"}
+        if t.type == "NULL":
+            return {"v": None, "t": "null"}
         raise ValueError(f"Unknown value type: {t}")
 
-    def value_list(self, items: list[Any]) -> list[Any]:
-        result: list[Any] = []
-        for i in items:
-            if isinstance(i, Token):
-                continue
-            result.append(i)
-        return result
+    def value_list(self, items: list[Any]) -> list[dict[str, Any]]:
+        return [i for i in items if isinstance(i, dict)]
 
-    # ---- SELECT helpers ----
+    # ---- SELECT structural pieces ----
 
-    def select_list(self, items: list[Any]) -> str:
-        return "*"
+    def column_ref(self, items: list[Any]) -> dict[str, Any]:
+        names = _strs(items)
+        if len(names) == 2:
+            return {"k": "ref", "t": names[0], "c": names[1]}
+        return {"k": "ref", "t": None, "c": names[0]}
 
-    def referred_table(self, items: list[Any]) -> str:
-        return _strs(items)[0]
+    def aggregate_func(self, items: list[Token]) -> str:
+        return str(items[0]).lower()
 
-    def table_reference_list(self, items: list[Any]) -> list[str]:
-        return _strs(items)
+    def selected_column(self, items: list[Any]) -> dict[str, Any]:
+        agg: str | None = None
+        alias: str | None = None
+        col: dict[str, Any] | None = None
+        for x in items:
+            if isinstance(x, dict) and x.get("k") == "ref":
+                col = x
+            elif isinstance(x, str) and not isinstance(x, Token):
+                if x in ("max", "min", "sum"):
+                    agg = x
+                else:
+                    alias = x
+        assert col is not None
+        return {"agg": agg, "col": col, "alias": alias}
 
-    def from_clause(self, items: list[Any]) -> list[str]:
+    def select_list(self, items: list[Any]) -> Any:
+        cols = [i for i in items if isinstance(i, dict) and "col" in i]
+        if not cols:
+            return SELECT_STAR
+        return cols
+
+    def referred_table(self, items: list[Any]) -> dict[str, Any]:
+        names = _strs(items)
+        name = names[0]
+        alias = names[1] if len(names) > 1 else name
+        return {"k": "base", "name": name, "alias": alias}
+
+    def join_condition(self, items: list[Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        refs = [i for i in items if isinstance(i, dict) and i.get("k") == "ref"]
+        return (refs[0], refs[1])
+
+    def joined_table(self, items: list[Any]) -> dict[str, Any]:
+        target = next(i for i in items if isinstance(i, dict) and i.get("k") == "base")
+        cond = next(i for i in items if isinstance(i, tuple))
+        return {
+            "k": "join",
+            "name": target["name"],
+            "alias": target["alias"],
+            "on": cond,
+        }
+
+    def table_reference_list(self, items: list[Any]) -> list[dict[str, Any]]:
+        return [
+            i for i in items if isinstance(i, dict) and i.get("k") in ("base", "join")
+        ]
+
+    def from_clause(self, items: list[Any]) -> list[dict[str, Any]]:
         return next(i for i in items if isinstance(i, list))
 
-    def table_expression(self, items: list[Any]) -> list[str]:
+    # ---- WHERE AST builders ----
+
+    def comparable_value(self, items: list[Token]) -> dict[str, Any]:
+        t = items[0]
+        if t.type == "INT":
+            return {"k": "val", "v": int(str(t)), "t": "int"}
+        if t.type == "STR":
+            return {"k": "val", "v": str(t)[1:-1], "t": "char"}
+        if t.type == "DATE":
+            return {"k": "val", "v": str(t), "t": "date"}
+        raise ValueError(f"Unknown literal: {t}")
+
+    def comp_operand(self, items: list[Any]) -> dict[str, Any]:
+        for i in items:
+            if isinstance(i, dict) and i.get("k") in ("val", "ref"):
+                return i
+        raise ValueError("comp_operand: no operand found")
+
+    def comp_op(self, items: list[Any]) -> str:
+        # items contains the literal op as a Token (anonymous terminal).
+        return str(items[0])
+
+    def comparison_predicate(self, items: list[Any]) -> dict[str, Any]:
+        operands = [
+            i for i in items if isinstance(i, dict) and i.get("k") in ("val", "ref")
+        ]
+        op = next(i for i in items if isinstance(i, str) and not isinstance(i, Token))
+        return {"k": "cmp", "lhs": operands[0], "rhs": operands[1], "op": op}
+
+    def null_operation(self, items: list[Token]) -> bool:
+        return any(isinstance(t, Token) and t.type == "NOT" for t in items)
+
+    def null_predicate(self, items: list[Any]) -> dict[str, Any]:
+        col = next(i for i in items if isinstance(i, dict) and i.get("k") == "ref")
+        negated = next(i for i in items if isinstance(i, bool))
+        return {
+            "k": "is_null",
+            "col": {"t": col["t"], "c": col["c"]},
+            "negated": negated,
+        }
+
+    def predicate(self, items: list[Any]) -> dict[str, Any]:
+        return next(i for i in items if isinstance(i, dict))
+
+    def parenthesized_boolean_expr(self, items: list[Any]) -> dict[str, Any]:
+        return next(i for i in items if isinstance(i, dict))
+
+    def boolean_test(self, items: list[Any]) -> dict[str, Any]:
+        return next(i for i in items if isinstance(i, dict))
+
+    def boolean_factor(self, items: list[Any]) -> dict[str, Any]:
+        inner = next(i for i in items if isinstance(i, dict))
+        if any(isinstance(t, Token) and t.type == "NOT" for t in items):
+            return {"k": "not", "x": inner}
+        return inner
+
+    def boolean_term(self, items: list[Any]) -> dict[str, Any]:
+        parts = [i for i in items if isinstance(i, dict)]
+        acc = parts[0]
+        for p in parts[1:]:
+            acc = {"k": "and", "a": acc, "b": p}
+        return acc
+
+    def boolean_expr(self, items: list[Any]) -> dict[str, Any]:
+        parts = [i for i in items if isinstance(i, dict)]
+        acc = parts[0]
+        for p in parts[1:]:
+            acc = {"k": "or", "a": acc, "b": p}
+        return acc
+
+    def where_clause(self, items: list[Any]) -> dict[str, Any]:
+        return next(i for i in items if isinstance(i, dict))
+
+    def order_by_clause(self, items: list[Any]) -> dict[str, Any]:
+        col = next(i for i in items if isinstance(i, dict) and i.get("k") == "ref")
+        direction = "asc"
+        for t in items:
+            if isinstance(t, Token) and t.type == "DESC":
+                direction = "desc"
+            elif isinstance(t, Token) and t.type == "ASC":
+                direction = "asc"
+        return {"col": col, "dir": direction}
+
+    def group_by_clause(self, items: list[Any]) -> dict[str, Any]:
+        col = next(i for i in items if isinstance(i, dict) and i.get("k") == "ref")
+        return {"col": col}
+
+    def limit_clause(self, items: list[Any]) -> tuple[str, int]:
+        n = next(i for i in items if isinstance(i, Token) and i.type == "INT")
+        return ("limit", int(str(n)))
+
+    def offset_clause(self, items: list[Any]) -> tuple[str, int]:
+        n = next(i for i in items if isinstance(i, Token) and i.type == "INT")
+        return ("offset", int(str(n)))
+
+    def table_expression(self, items: list[Any]) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "from": [],
+            "where": None,
+            "group": None,
+            "order": None,
+            "limit": None,
+            "offset": None,
+        }
         for i in items:
             if isinstance(i, list):
-                return i
-        return []
+                out["from"] = i
+            elif isinstance(i, tuple) and len(i) == 2 and i[0] in ("limit", "offset"):
+                out[i[0]] = i[1]
+            elif isinstance(i, dict):
+                if "dir" in i:
+                    out["order"] = i
+                elif "k" in i:
+                    out["where"] = i
+                elif "col" in i:
+                    out["group"] = i
+        return out
 
     # ---- DDL: CREATE TABLE ----
 
@@ -452,64 +812,294 @@ class SQLTransformer(Transformer):  # type: ignore[type-arg]
     # ---- DML: INSERT ----
 
     def insert_query(self, items: list[Any]) -> Result:
-        parts = [i for i in items if not isinstance(i, Token)]
-        tname: str = parts[0]
+        tname: str = next(
+            i for i in items if isinstance(i, str) and not isinstance(i, Token)
+        )
+        col_list: list[str] | None = next(
+            (i for i in items if isinstance(i, list) and i and isinstance(i[0], str)),
+            None,
+        )
+        vals: list[dict[str, Any]] = next(
+            i for i in items if isinstance(i, list) and i and isinstance(i[0], dict)
+        )
 
         if not self.db.has_table(tname):
             return Result("Insert has failed: no such table")
 
-        schema = self.db.get_schema(tname)
-        columns: list[dict[str, Any]] = schema["columns"]
+        columns: list[dict[str, Any]] = self.db.get_schema(tname)["columns"]
+        col_index = {c["name"]: i for i, c in enumerate(columns)}
 
-        # Determine if column list is present.
-        if len(parts) == 3:
-            col_list: list[str] = parts[1]
-            vals: list[Any] = parts[2]
+        if col_list is not None:
+            for c in col_list:
+                if c not in col_index:
+                    return Result(f"Insert has failed: '{c}' does not exist")
+            if len(col_list) != len(vals):
+                return Result("Insert has failed: types are not matched")
         else:
-            col_list = []
-            vals = parts[1]
+            if len(vals) != len(columns):
+                return Result("Insert has failed: types are not matched")
 
-        # Build row in table column order.
-        if not col_list:
-            row: list[Any] = list(vals)
-        else:
-            row = [None] * len(columns)
-            idx = {c["name"]: i for i, c in enumerate(columns)}
-            for c, v in zip(col_list, vals):
-                row[idx[c]] = v
+        row: list[Any] = [None] * len(columns)
+        targets = col_list if col_list is not None else [c["name"] for c in columns]
+        for cname, val in zip(targets, vals):
+            i = col_index[cname]
+            ct = _col_type(columns[i]["type"])
+            if val["t"] != "null" and val["t"] != ct:
+                return Result("Insert has failed: types are not matched")
+            row[i] = val["v"]
 
-        # Truncate char values exceeding max length.
         for i, c in enumerate(columns):
+            if row[i] is None and c["not_null"]:
+                return Result(f"Insert has failed: '{c['name']}' is not nullable")
             if c["type"][0] == "char" and isinstance(row[i], str):
                 ml: int = c["type"][1]
                 if len(row[i]) > ml:
                     row[i] = row[i][:ml]
 
         self.db.add_row(tname, row)
-        return Result("The row is inserted")
+        return Result("1 row inserted")
 
     # ---- DML: SELECT ----
 
     def select_query(self, items: list[Any]) -> Result:
-        parts = [i for i in items if not isinstance(i, Token)]
-        tables: list[str] = parts[1]
-        tname = tables[0]
+        from itertools import product
 
+        sel: Any = next(
+            (i for i in items if i == SELECT_STAR or isinstance(i, list)), None
+        )
+        texp: dict[str, Any] = next(
+            i for i in items if isinstance(i, dict) and "from" in i
+        )
+
+        scope: list[dict[str, Any]] = []
+        joins: list[tuple[dict[str, Any], dict[str, Any]]] = []
+        for entry in texp["from"]:
+            if not self.db.has_table(entry["name"]):
+                return Result(f"Select has failed: '{entry['name']}' does not exist")
+            scope.append(
+                _scope_entry(
+                    entry["name"], entry["alias"], self.db.get_schema(entry["name"])
+                )
+            )
+            if entry["k"] == "join":
+                joins.append(entry["on"])
+
+        try:
+            bound_joins: list[tuple[dict[str, Any], dict[str, Any]]] = []
+            for lhs, rhs in joins:
+                lb = _resolve_column({"t": lhs["t"], "c": lhs["c"]}, scope, "join")
+                rb = _resolve_column({"t": rhs["t"], "c": rhs["c"]}, scope, "join")
+                if lb["type"] != rb["type"]:
+                    raise _QueryError("INCOMPARABLE")
+                bound_joins.append((lb, rb))
+
+            where_b = _bind_expr(texp["where"], scope, "where")
+
+            order_b: dict[str, Any] | None = None
+            if texp["order"] is not None:
+                order_b = _resolve_column(
+                    {"t": texp["order"]["col"]["t"], "c": texp["order"]["col"]["c"]},
+                    scope,
+                    "order by",
+                )
+
+            projection: list[dict[str, Any]] = []
+            if sel == SELECT_STAR:
+                multi = len(scope) > 1
+                for e in scope:
+                    for c in e["schema"]["columns"]:
+                        header = f"{e['alias']}.{c['name']}" if multi else c["name"]
+                        projection.append(
+                            {
+                                "header": header,
+                                "alias": e["alias"],
+                                "col": c["name"],
+                                "agg": None,
+                            }
+                        )
+            else:
+                for sc in sel:
+                    ref = sc["col"]
+                    try:
+                        b = _resolve_column(
+                            {"t": ref["t"], "c": ref["c"]}, scope, "select"
+                        )
+                    except _QueryError:
+                        raise _QueryError("SELECT_COL_RESOLVE", col=ref["c"])
+                    base = f"{ref['t']}.{ref['c']}" if ref["t"] else ref["c"]
+                    if sc["alias"]:
+                        header = sc["alias"]
+                    elif sc["agg"]:
+                        header = f"{sc['agg']}({base})"
+                    else:
+                        header = base
+                    projection.append(
+                        {
+                            "header": header,
+                            "alias": b["alias"],
+                            "col": b["col"],
+                            "agg": sc["agg"],
+                        }
+                    )
+
+            group_b: dict[str, Any] | None = None
+            if texp["group"] is not None:
+                group_b = _resolve_column(
+                    {"t": texp["group"]["col"]["t"], "c": texp["group"]["col"]["c"]},
+                    scope,
+                    "group by",
+                )
+        except _QueryError as e:
+            return _msg_for(e)
+
+        has_agg = any(p["agg"] for p in projection)
+        if (group_b is not None or has_agg) and sel != SELECT_STAR:
+            for p in projection:
+                if p["agg"]:
+                    continue
+                if group_b is None or (p["alias"], p["col"]) != (
+                    group_b["alias"],
+                    group_b["col"],
+                ):
+                    return Result(
+                        f"Select has failed: column '{p['col']}' must either be "
+                        f"included in the GROUP BY clause or be used in an aggregate function"
+                    )
+
+        limit = texp["limit"]
+        offset = texp["offset"]
+        if (limit is not None and limit < 0) or (offset is not None and offset < 0):
+            return _msg_for(_QueryError("INVALID_LIMIT_OFFSET"))
+
+        table_rows = [self.db.get_rows(e["name"]) for e in scope]
+        envs: list[dict[tuple[str, str], Any]] = []
+        for combo in product(*table_rows):
+            env: dict[tuple[str, str], Any] = {}
+            for entry, row in zip(scope, combo):
+                env.update(_row_env(entry, row))
+            if any(
+                env[(lb["alias"], lb["col"])] is None
+                or env[(rb["alias"], rb["col"])] is None
+                or env[(lb["alias"], lb["col"])] != env[(rb["alias"], rb["col"])]
+                for lb, rb in bound_joins
+            ):
+                continue
+            if _eval_expr(where_b, env) is True:
+                envs.append(env)
+
+        if group_b is not None or has_agg:
+            groups: dict[Any, list[dict[tuple[str, str], Any]]] = {}
+            keys: list[Any] = []
+            for env in envs:
+                k = env[(group_b["alias"], group_b["col"])] if group_b else None
+                if k not in groups:
+                    groups[k] = []
+                    keys.append(k)
+                groups[k].append(env)
+
+            out_rows: list[list[Any]] = []
+            for k in keys:
+                gevs = groups[k]
+                row: list[Any] = []
+                for p in projection:
+                    if p["agg"]:
+                        vals = [g[(p["alias"], p["col"])] for g in gevs]
+                        row.append(_aggregate(p["agg"], vals))
+                    else:
+                        row.append(gevs[0][(p["alias"], p["col"])])
+                out_rows.append(row)
+
+            if order_b is not None:
+                idx = next(
+                    (
+                        i
+                        for i, p in enumerate(projection)
+                        if not p["agg"]
+                        and (p["alias"], p["col"]) == (order_b["alias"], order_b["col"])
+                    ),
+                    None,
+                )
+                if idx is not None:
+                    rev = texp["order"]["dir"] == "desc"
+                    nulls = [r for r in out_rows if r[idx] is None]
+                    non_null = [r for r in out_rows if r[idx] is not None]
+                    non_null.sort(key=lambda r: r[idx], reverse=rev)
+                    out_rows = (nulls + non_null) if rev else (non_null + nulls)
+        else:
+            if order_b is not None:
+                key = (order_b["alias"], order_b["col"])
+                rev = texp["order"]["dir"] == "desc"
+                nulls = [e for e in envs if e[key] is None]
+                non_nulls = [e for e in envs if e[key] is not None]
+                non_nulls.sort(key=lambda e: e[key], reverse=rev)
+                envs = (nulls + non_nulls) if rev else (non_nulls + nulls)
+            out_rows = [
+                [env[(p["alias"], p["col"])] for p in projection] for env in envs
+            ]
+
+        if offset:
+            out_rows = out_rows[offset:]
+        if limit is not None:
+            out_rows = out_rows[:limit]
+
+        headers = [p["header"] for p in projection]
+        drows = [["null" if v is None else str(v) for v in r] for r in out_rows]
+        return _fmt_table(headers, drows)
+
+    # ---- DML: DELETE ----
+
+    def delete_query(self, items: list[Any]) -> Result:
+        tname: str = next(
+            i for i in items if isinstance(i, str) and not isinstance(i, Token)
+        )
         if not self.db.has_table(tname):
-            return Result(f"Select has failed: '{tname}' does not exist")
+            return Result("Delete has failed: no such table")
 
-        schema = self.db.get_schema(tname)
-        hdrs = [c["name"].upper() for c in schema["columns"]]
+        where = next((i for i in items if isinstance(i, dict) and i.get("k")), None)
+        scope = [_scope_entry(tname, tname, self.db.get_schema(tname))]
+        try:
+            where_b = _bind_expr(where, scope, "where")
+        except _QueryError as e:
+            return _msg_for(e)
+
         rows = self.db.get_rows(tname)
-        drows: list[list[str]] = [
-            [str(v) if v is not None else "null" for v in r] for r in rows
+        matched = [
+            r for r in rows if _eval_expr(where_b, _row_env(scope[0], r)) is True
         ]
-        return _fmt_table(hdrs, drows)
+        blocked = [r for r in matched if self._row_referenced(tname, r)]
 
-    # ---- Unimplemented (pass-through for future projects) ----
+        if blocked:
+            return Result(
+                f"'{len(matched)}' row(s) are not deleted due to referential integrity"
+            )
+        deleted_ids = {id(r) for r in matched}
+        survivors = [r for r in rows if id(r) not in deleted_ids]
+        self.db.set_rows(tname, survivors)
+        return Result(f"'{len(matched)}' row(s) deleted")
 
-    def delete_query(self, _: list[Any]) -> Result:
-        return Result("'DELETE' requested")
+    def _row_referenced(self, parent: str, parent_row: list[Any]) -> bool:
+        ps = self.db.get_schema(parent)
+        p_idx = {c["name"]: i for i, c in enumerate(ps["columns"])}
+        for child in self.db.get_tables():
+            if child == parent:
+                continue
+            cs = self.db.get_schema(child)
+            c_idx = {c["name"]: i for i, c in enumerate(cs["columns"])}
+            for fk in cs.get("foreign_keys", []):
+                if fk["ref_table"] != parent:
+                    continue
+                fk_pos = [c_idx[c] for c in fk["columns"]]
+                ref_pos = [p_idx[c] for c in fk["ref_columns"]]
+                parent_vals = [parent_row[i] for i in ref_pos]
+                if any(v is None for v in parent_vals):
+                    continue
+                for child_row in self.db.get_rows(child):
+                    child_vals = [child_row[i] for i in fk_pos]
+                    if child_vals == parent_vals:
+                        return True
+        return False
+
+    # ---- DML: UPDATE (pass-through; not in spec for 1-3) ----
 
     def update_query(self, _: list[Any]) -> Result:
         return Result("'UPDATE' requested")
