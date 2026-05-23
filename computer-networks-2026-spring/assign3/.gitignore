@@ -1,0 +1,52 @@
+# build artifacts
+*.o
+*.a
+*.so
+*.d
+.*.d
+etcp/lib/
+etcp/include/etcp_api.h
+etcp/include/etcp_epoll.h
+
+# example binaries
+example/part1/ETCP_server
+example/part1/ETCP_client
+example/part2/ETCP_server
+example/part2/ETCP_client
+
+# linux_app binaries
+linux_app/part1/linux_server
+linux_app/part1/linux_client
+linux_app/part2/linux_server
+linux_app/part2/linux_client
+
+# runtime output
+example/part2/output.*
+example/part2/downloaded_*
+linux_app/part2/downloaded_*
+*.pcap
+*.log
+cc_trace.log
+
+# Windows zone identifiers
+*:Zone.Identifier
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# submission artifacts
+*_assign3/
+*_assign3.tar.gz
+readme.pdf
+
+# generated arp config
+example/part1/config/
+example/part2/config/
