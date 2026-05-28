@@ -16,8 +16,7 @@ clean :
 submit :
 	zip -r $(SUBMIT) \
 		Makefile requirements.txt README.md \
-		main.py render.py shader.py control.py scene.py \
-		primitives.py \
+		main.py render.py shader.py control.py scene.py mesh.py
 
 .PHONY: run clean submit
 
