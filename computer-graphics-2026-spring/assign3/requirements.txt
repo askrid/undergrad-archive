@@ -1,0 +1,13 @@
+black==26.5.1
+click==8.4.1
+mypy_extensions==1.1.0
+nodeenv==1.10.0
+numpy>=1.26
+packaging==26.2
+pathspec==1.1.1
+Pillow>=10.0
+platformdirs==4.10.0
+pyglet==2.1.14
+pyright==1.1.409
+pytokens==0.4.1
+typing_extensions==4.15.0
