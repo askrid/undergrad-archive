@@ -1,12 +1,3 @@
-"""Mouse + keyboard input.
-
-Camera: left-drag orbits, middle/right-drag pans, scroll zooms, R reset.
-Shading: 1..5 force mode, 0 restores per-shape.
-Editing: Tab cycles selected object (Shift+Tab back), hjkl + n/m translate,
-Shift+hjkl + n/m rotate around Y/X/Z, -/= scale uniformly, Enter saves the
-current scene.json. Esc quits.
-"""
-
 from __future__ import annotations
 
 import math
@@ -25,9 +16,9 @@ _MODE_KEYS = {
     key._5: ShadeMode.PHONG_NORMAL,
 }
 
-TRANSLATE_STEP = 0.05
-ROTATE_STEP_DEG = 5.0
-SCALE_FACTOR = 1.05
+TRANSLATE_STEP = 0.01
+ROTATE_STEP_DEG = 1.0
+SCALE_FACTOR = 1.01
 
 
 class Control:

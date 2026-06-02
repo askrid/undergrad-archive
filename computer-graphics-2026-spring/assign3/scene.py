@@ -1,12 +1,3 @@
-"""Materials, lights, scene container, texture loading, scene.json IO.
-
-Every folder under `models/` is treated the same way: it contains a
-`scene.json` plus its OBJ + texture files. The JSON describes global
-state (lights, ambient, background, wire colour) and a list of objects.
-Missing fields fall back to the defaults below. Any OBJ that exists in
-the folder but isn't listed is auto-added with defaults on load.
-"""
-
 from __future__ import annotations
 
 import json
@@ -176,6 +167,7 @@ class SceneItem:
     transform: Transform
     material_spec: dict
     mode: ShadeMode
+    normalize: bool = True
 
 
 # ---------------------------------------------------------------------------
@@ -310,6 +302,7 @@ def load_scene(scene_path: str, base_dir: str) -> tuple[Scene, list[SceneItem]]:
                 transform=Transform.from_dict(raw.get("transform") or {}),
                 material_spec=_merge_material_spec(raw.get("material")),
                 mode=_MODE_BY_NAME.get(raw.get("mode", "phong"), ShadeMode.PHONG),
+                normalize=raw.get("normalize", True),
             )
         )
         seen.add(_norm(obj_file))

@@ -1,3 +1,128 @@
 {
-  "objects": []
+  "lights": [
+    {
+      "position": [3.0, 6.0, 2.0],
+      "color": [1.0, 0.9, 0.6],
+      "intensity": 2.0
+    },
+    {
+      "position": [-5.0, 1.0, -3.0],
+      "color": [0.2, 0.3, 0.8],
+      "intensity": 0.8
+    },
+    {
+      "position": [-1.0, 0.5, 5.0],
+      "color": [1.0, 0.2, 0.1],
+      "intensity": 0.6
+    },
+    {
+      "position": [0.0, -2.0, -1.0],
+      "color": [0.6, 0.4, 1.0],
+      "intensity": 0.3
+    }
+  ],
+  "ambient": [0.03, 0.03, 0.04],
+  "background": [0.01, 0.01, 0.02, 1.0],
+  "wire_color": [
+    0.9,
+    0.9,
+    0.9
+  ],
+  "objects": [
+    {
+      "name": "skateboard",
+      "file": "Skateboard.obj",
+      "mode": "phong_normal",
+      "transform": {
+        "translate": [
+          -0.11000000000000001,
+          -0.38999999999999996,
+          0.2
+        ],
+        "rotate_deg": [
+          20.0,
+          -85.0,
+          -14.0
+        ],
+        "scale": [
+          0.3100679102826499,
+          0.3100679102826499,
+          0.3100679102826499
+        ]
+      },
+      "material": {
+        "ka": [
+          0.1,
+          0.1,
+          0.1
+        ],
+        "kd": [
+          0.6,
+          0.6,
+          0.6
+        ],
+        "ks": [
+          0.9,
+          0.9,
+          0.9
+        ],
+        "shininess": 16.0,
+        "rough_a": 200.0,
+        "rough_b": 0.05,
+        "textures": {
+          "base_color": "textures/Skateboard_M_Skateboard1_BaseColor.png",
+          "normal": "textures/Skateboard_M_Skateboard1_Normal.png",
+          "roughness": "textures/Skateboard_M_Skateboard1_Roughness.png",
+          "specular": "textures/Skateboard_M_Skateboard1_Metallic.png"
+        }
+      }
+    },
+    {
+      "name": "funbox",
+      "file": "Funbox.obj",
+      "mode": "phong_normal",
+      "transform": {
+        "translate": [
+          0.0,
+          -0.5,
+          0.0
+        ],
+        "rotate_deg": [
+          0.0,
+          10.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "material": {
+        "ka": [
+          0.1,
+          0.1,
+          0.1
+        ],
+        "kd": [
+          0.6,
+          0.6,
+          0.6
+        ],
+        "ks": [
+          0.7,
+          0.7,
+          0.7
+        ],
+        "shininess": 8.0,
+        "rough_a": 200.0,
+        "rough_b": 0.05,
+        "textures": {
+          "base_color": "textures/funbox_diffuse.jpg",
+          "normal": "textures/funbox_normals.jpg",
+          "specular": "textures/funbox_specular.jpg"
+        }
+      }
+    }
+  ]
 }

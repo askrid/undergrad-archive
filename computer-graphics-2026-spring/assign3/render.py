@@ -1,5 +1,3 @@
-"""Window + shape group. Orbit camera, scene composition, frame loop."""
-
 from __future__ import annotations
 
 import math

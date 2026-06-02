@@ -1,8 +1,3 @@
-"""Single uber shader. Mode uniform selects:
-    0 wireframe, 1 Gouraud, 2 Phong, 3 Phong+textures, 4 Phong+normal map.
-Up to 4 point lights.
-"""
-
 from pyglet.graphics.shader import Shader, ShaderProgram
 
 MAX_LIGHTS = 4

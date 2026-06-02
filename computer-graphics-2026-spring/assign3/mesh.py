@@ -1,5 +1,3 @@
-"""Triangle mesh: Wavefront OBJ loader."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field

@@ -1,14 +1,6 @@
 """Run a model folder.
 
     python main.py <name>
-
-Each folder under `models/<name>/` carries its own `scene.json` describing
-lights, ambient/background colours, and a list of objects with transforms +
-materials. OBJ files present in the folder but absent from the JSON are
-auto-added with defaults on load. Enter saves the current state back.
-
-Keys: 1..5 force shading mode, 0 per-shape, R reset camera, Tab cycles
-object, hjkl + n/m translate, Shift+… rotate, -/= scale, Enter save, Esc quit.
 """
 
 from __future__ import annotations
@@ -40,7 +32,7 @@ def main() -> None:
 
     groups = []
     for it in items:
-        mesh = load_obj(os.path.join(model_dir, it.obj_file))
+        mesh = load_obj(os.path.join(model_dir, it.obj_file), normalize=it.normalize)
         material = build_material(model_dir, it.material_spec)
         group = window.add_shape(it.transform.matrix(), mesh, material, it.mode)
         groups.append(group)
