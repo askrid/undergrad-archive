@@ -1,12 +1,10 @@
-"""Triangle mesh: loader for Wavefront OBJ, factories for primitives."""
+"""Triangle mesh: Wavefront OBJ loader."""
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 
 import numpy as np
-from pyglet.math import Vec3
 
 
 @dataclass
@@ -52,10 +50,10 @@ def load_obj(path: str, normalize: bool = True) -> Mesh:
             elif tag == "f":
                 corners = []
                 for tok in rest:
-                    parts = tok.split("/")
-                    pi = int(parts[0]) - 1
-                    ti = int(parts[1]) - 1 if len(parts) > 1 and parts[1] else -1
-                    ni = int(parts[2]) - 1 if len(parts) > 2 and parts[2] else -1
+                    sub = tok.split("/")
+                    pi = int(sub[0]) - 1
+                    ti = int(sub[1]) - 1 if len(sub) > 1 and sub[1] else -1
+                    ni = int(sub[2]) - 1 if len(sub) > 2 and sub[2] else -1
                     corners.append((pi, ti, ni))
                 faces.append(corners)
 
@@ -155,63 +153,3 @@ def _normalize_rows(a: np.ndarray) -> np.ndarray:
     norms = np.linalg.norm(a, axis=1, keepdims=True)
     norms[norms == 0.0] = 1.0
     return a / norms
-
-
-# ---------------------------------------------------------------------------
-# Primitive factories
-# ---------------------------------------------------------------------------
-
-
-def make_cube(size: Vec3 = Vec3(1.0, 1.0, 1.0)) -> Mesh:
-    h = (size.x * 0.5, size.y * 0.5, size.z * 0.5)
-    faces = [
-        ((0, 0, 1), (1, 0, 0), [(-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1)]),
-        ((0, 0, -1), (-1, 0, 0), [(1, -1, -1), (-1, -1, -1), (-1, 1, -1), (1, 1, -1)]),
-        ((1, 0, 0), (0, 0, -1), [(1, -1, 1), (1, -1, -1), (1, 1, -1), (1, 1, 1)]),
-        ((-1, 0, 0), (0, 0, 1), [(-1, -1, -1), (-1, -1, 1), (-1, 1, 1), (-1, 1, -1)]),
-        ((0, 1, 0), (1, 0, 0), [(-1, 1, 1), (1, 1, 1), (1, 1, -1), (-1, 1, -1)]),
-        ((0, -1, 0), (1, 0, 0), [(-1, -1, -1), (1, -1, -1), (1, -1, 1), (-1, -1, 1)]),
-    ]
-    uv_corners = [(0, 0), (1, 0), (1, 1), (0, 1)]
-    m = Mesh()
-    for face_idx, (n, t, corners) in enumerate(faces):
-        base = face_idx * 4
-        for k, (x, y, z) in enumerate(corners):
-            m.positions += [h[0] * x, h[1] * y, h[2] * z]
-            m.normals += list(n)
-            m.uvs += list(uv_corners[k])
-            m.tangents += list(t)
-        m.indices += [base, base + 1, base + 2, base + 2, base + 3, base]
-    return m
-
-
-def make_sphere(radius: float = 1.0, stacks: int = 32, slices: int = 32) -> Mesh:
-    m = Mesh()
-    for i in range(stacks + 1):
-        phi = math.pi * i / stacks
-        sp, cp = math.sin(phi), math.cos(phi)
-        for j in range(slices + 1):
-            theta = 2.0 * math.pi * j / slices
-            st, ct = math.sin(theta), math.cos(theta)
-            x, y, z = sp * ct, cp, sp * st
-            m.positions += [radius * x, radius * y, radius * z]
-            m.normals += [x, y, z]
-            m.uvs += [j / slices, 1.0 - i / stacks]
-            m.tangents += [-st, 0.0, ct]
-    for i in range(stacks):
-        for j in range(slices):
-            a = i * (slices + 1) + j
-            b = a + slices + 1
-            m.indices += [a, b, a + 1, b, b + 1, a + 1]
-    return m
-
-
-def make_plane(size: float = 10.0, repeat: float = 1.0) -> Mesh:
-    s = size * 0.5
-    return Mesh(
-        positions=[-s, 0, -s, s, 0, -s, s, 0, s, -s, 0, s],
-        normals=[0, 1, 0] * 4,
-        uvs=[0, 0, repeat, 0, repeat, repeat, 0, repeat],
-        tangents=[1, 0, 0] * 4,
-        indices=[0, 3, 2, 2, 1, 0],  # CCW from above
-    )
