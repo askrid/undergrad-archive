@@ -26,7 +26,7 @@ def main() -> None:
 
     scene_def, items = load_scene(scene_path, model_dir)
     window = RenderWindow(
-        1280, 720, f"CG PA3 — {name}", resizable=True, scene=scene_def
+        1280, 720, f"CG PA3 - {name}", resizable=True, scene=scene_def
     )
     window.set_location(120, 120)
 

@@ -23,6 +23,7 @@ clean :
 submit :
 	zip -r $(SUBMIT) \
 		Makefile requirements.txt README.md \
-		main.py render.py shader.py control.py scene.py mesh.py
+		main.py render.py shader.py control.py scene.py mesh.py \
+		models docs/*.png
 
 .PHONY: run rock art clean submit
