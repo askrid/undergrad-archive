@@ -72,4 +72,6 @@ Free models:
 
 - [Funbox](https://www.turbosquid.com/FullPreview/991982)
 - [Skateboard](https://www.turbosquid.com/FullPreview/2336586)
+- [Tank](https://www.turbosquid.com/FullPreview/2519061)
+- [Palm Tree](https://www.turbosquid.com/FullPreview/2396373)
 

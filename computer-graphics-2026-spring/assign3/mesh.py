@@ -24,8 +24,7 @@ class Mesh:
 
 
 def load_obj(path: str, normalize: bool = True) -> Mesh:
-    """Read an OBJ file. Fan-triangulates n-gons, computes missing normals,
-    derives tangents from UVs. With normalize=True the mesh is recentered
+    """Read an OBJ file. With normalize=True the mesh is recentered
     and scaled so its longest axis spans [-1, 1].
     """
     v: list[tuple[float, float, float]] = []

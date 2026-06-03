@@ -1,28 +1,69 @@
 {
   "lights": [
     {
-      "position": [3.0, 6.0, 2.0],
-      "color": [1.0, 0.9, 0.6],
+      "position": [
+        3.0,
+        6.0,
+        2.0
+      ],
+      "color": [
+        1.0,
+        0.9,
+        0.6
+      ],
       "intensity": 2.0
     },
     {
-      "position": [-5.0, 1.0, -3.0],
-      "color": [0.2, 0.3, 0.8],
+      "position": [
+        -5.0,
+        1.0,
+        -3.0
+      ],
+      "color": [
+        0.2,
+        0.3,
+        0.8
+      ],
       "intensity": 0.8
     },
     {
-      "position": [-1.0, 0.5, 5.0],
-      "color": [1.0, 0.2, 0.1],
+      "position": [
+        -1.0,
+        0.5,
+        5.0
+      ],
+      "color": [
+        1.0,
+        0.2,
+        0.1
+      ],
       "intensity": 0.6
     },
     {
-      "position": [0.0, -2.0, -1.0],
-      "color": [0.6, 0.4, 1.0],
+      "position": [
+        0.0,
+        -2.0,
+        -1.0
+      ],
+      "color": [
+        0.6,
+        0.4,
+        1.0
+      ],
       "intensity": 0.3
     }
   ],
-  "ambient": [0.03, 0.03, 0.04],
-  "background": [0.01, 0.01, 0.02, 1.0],
+  "ambient": [
+    0.03,
+    0.03,
+    0.04
+  ],
+  "background": [
+    0.01,
+    0.01,
+    0.02,
+    1.0
+  ],
   "wire_color": [
     0.9,
     0.9,
@@ -121,6 +162,102 @@
           "base_color": "textures/funbox_diffuse.jpg",
           "normal": "textures/funbox_normals.jpg",
           "specular": "textures/funbox_specular.jpg"
+        }
+      }
+    },
+    {
+      "name": "abrams_tank",
+      "file": "AbramsLow.obj",
+      "mode": "phong_normal",
+      "transform": {
+        "translate": [
+          -1.270000000000001,
+          -0.2800000000000001,
+          -1.02
+        ],
+        "rotate_deg": [
+          0.0,
+          -128.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "material": {
+        "ka": [
+          0.08,
+          0.08,
+          0.06
+        ],
+        "kd": [
+          0.6,
+          0.6,
+          0.55
+        ],
+        "ks": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "shininess": 12.0,
+        "rough_a": 200.0,
+        "rough_b": 0.05,
+        "textures": {
+          "base_color": "textures/lowabramstexture_Abrams_BaseColor.png",
+          "normal": "textures/lowabramstexture_Abrams_Normal.png",
+          "roughness": "textures/lowabramstexture_Abrams_Roughness.png",
+          "specular": "textures/lowabramstexture_Abrams_Metallic.png"
+        }
+      }
+    },
+    {
+      "name": "palm_tree",
+      "file": "palm.obj",
+      "mode": "phong_normal",
+      "transform": {
+        "translate": [
+          1.53,
+          0.2800000000000001,
+          0.8200000000000003
+        ],
+        "rotate_deg": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "material": {
+        "ka": [
+          0.1,
+          0.1,
+          0.08
+        ],
+        "kd": [
+          0.6,
+          0.6,
+          0.55
+        ],
+        "ks": [
+          0.3,
+          0.3,
+          0.3
+        ],
+        "shininess": 4.0,
+        "rough_a": 200.0,
+        "rough_b": 0.05,
+        "textures": {
+          "base_color": "textures/material_BaseColor.jpg",
+          "normal": "textures/material_Normal.png",
+          "roughness": "textures/material_Roughness.png",
+          "specular": "textures/material_Metallic.png"
         }
       }
     }
