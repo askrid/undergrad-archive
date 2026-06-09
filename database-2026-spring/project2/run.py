@@ -14,7 +14,7 @@ DB_CONFIG = dict(
     password="DB2020_17316",
     database="DB2020_17316",
     charset="utf8mb4",
-    collation="utf8mb4_bin",
+    collation="utf8mb4_bin",  # accent-sensitive: "La vita e bella" vs "La vita è bella" must be distinct
 )
 
 DATA_CSV = Path(__file__).resolve().parent / "data.csv"
@@ -140,13 +140,13 @@ def create_schema(cur) -> None:
         cur.execute(sql)
 
 
-def any_known_table_exists(cur) -> bool:
+def count_known_tables(cur) -> int:
     cur.execute(
-        "SELECT 1 FROM information_schema.tables "
-        "WHERE table_schema=%s AND table_name IN (%s,%s,%s,%s,%s) LIMIT 1",
+        "SELECT COUNT(*) FROM information_schema.tables "
+        "WHERE table_schema=%s AND table_name IN (%s,%s,%s,%s,%s)",
         (DB_CONFIG["database"], *TABLES),
     )
-    return fetch_one(cur) is not None
+    return int(fetch_required(cur)[0])
 
 
 def drop_schema(cur) -> None:
@@ -182,8 +182,12 @@ def load_csv(cur) -> None:
         "INSERT INTO users (u_id, u_name, u_age, cumul_rent_cnt) VALUES (%s,%s,%s,%s)",
         [(i, n, a, u_counts[i]) for i, (n, a) in sorted(users.items())],
     )
+    # CSV may repeat (u, d): each occurrence is a rental event (counted above),
+    # but only the latest rating persists per spec 2-9 (overwrite).
     cur.executemany(
-        "INSERT IGNORE INTO ratings (u_id, d_id, rating) VALUES (%s,%s,%s)", ratings
+        "INSERT INTO ratings (u_id, d_id, rating) VALUES (%s,%s,%s) "
+        "ON DUPLICATE KEY UPDATE rating=VALUES(rating)",
+        ratings,
     )
     if dvds:
         cur.execute(f"ALTER TABLE dvds AUTO_INCREMENT = {max(dvds) + 1}")
@@ -246,10 +250,17 @@ def do_borrow(cur, d_id: int, u_id: int) -> None:
 
 def initialize_database():
     with cursor() as cur:
-        if any_known_table_exists(cur):
-            print("Database already initialized. Use menu 17 to reset.")
+        present = count_known_tables(cur)
+        if present == 0:
+            create_schema(cur)
+        elif present == len(TABLES):
+            cur.execute("SELECT COUNT(*) FROM dvds")
+            if fetch_required(cur)[0] > 0:
+                print("Database already contains data. Use menu 17 to reset.")
+                return
+        else:
+            print("Schema is partially present. Use menu 17 to reset.")
             return
-        create_schema(cur)
         load_csv(cur)
         commit()
     print("Database successfully initialized")
@@ -445,6 +456,7 @@ def bump_overdue_for_dvd(cur, d_id: int) -> None:
     )
     for bu, overdue, restricted in fetch_all(cur):
         new_overdue = overdue + 1
+        # only flip to restricted on the crossing edge; already-restricted users keep accumulating
         if not restricted and new_overdue >= OVERDUE_THRESHOLD:
             cur.execute(
                 "UPDATE users SET overdue=%s, restricted=1, penalty_left=%s "
@@ -520,8 +532,8 @@ def checkout_DVD():
 
 
 def auto_checkout_reserver(cur, d_id: int) -> None:
-    """Promote pending reservation to a borrow if eligible. Caller must have
-    already incremented stock by 1; success path does the matching decrement."""
+    # Caller has already bumped stock +1 (return). Success path: do_borrow's -1
+    # nets to zero (DVD transfers to reserver). Failure path leaves stock at +1.
     cur.execute("SELECT u_id FROM reservations WHERE d_id=%s", (d_id,))
     rv = fetch_one(cur)
     if not rv:
@@ -747,6 +759,7 @@ def recommend_user_based():
         exp_rs = np.zeros(len(candidates))
     else:
         exp_rs = (sim_others @ matrix_others[:, cand_j]) / sim_sum
+    # lexsort primary key is last: -exp_rs ascending (max first), then cand_d ascending (smallest id wins ties)
     best = int(np.lexsort((cand_d, -exp_rs))[0])
     best_d, best_exp = int(cand_d[best]), float(exp_rs[best])
 
