@@ -2,11 +2,18 @@ STUDENTID = 2020-17316
 SUBMITFILE = PRJ2_$(STUDENTID)
 SPYTHON = python3.12
 VENV = .venv
-FILES = run.py data.csv Makefile requirements.txt \
+FILES = run.py truncate.py data.csv \
+		Makefile requirements.txt \
 		README.md $(SUBMITFILE).pdf  \
 
 run: $(VENV)
 	$(VENV)/bin/python run.py
+
+truncate: $(VENV)
+	$(VENV)/bin/python truncate.py
+
+$(SUBMITFILE).pdf: README.md
+	pandoc README.md -o $(SUBMITFILE).pdf --pdf-engine=typst
 
 $(VENV): requirements.txt
 	$(SPYTHON) -m venv $(VENV)
@@ -18,8 +25,8 @@ submit: $(FILES)
 	zip $(SUBMITFILE).zip $(FILES)
 
 clean:
-	rm -f $(SUBMITFILE).zip
+	rm -f $(SUBMITFILE).zip $(SUBMITFILE).pdf
 	rm -rf $(VENV)
 
-.PHONY: run submit clean
+.PHONY: run truncate submit clean
 

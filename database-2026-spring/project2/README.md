@@ -2,19 +2,19 @@
 
 ## Run
 
+The database connection is configured in `DB_CONFIG` in `run.py`.
+
 ```bash
 make run
 
-# or manually:
-python3.12 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python run.py
+# You can also truncate the existing records.
+make truncate
 ```
 
 ## Database schema
 
 | table | columns | notes |
-|---|---|---|
+|:---|:---|:---|
 | `dvds` | `d_id` PK AI, `d_title` VARCHAR(50), `d_name` VARCHAR(50), `age_limit` TINYINT, `stock` INT (default 2), `cumul_rent_cnt` INT, UNIQUE(`d_title`, `d_name`) | utf8mb4_bin on title/director so accent-sensitive |
 | `users` | `u_id` PK AI, `u_name` VARCHAR(30), `u_age` INT, `overdue` INT, `penalty_left` INT, `restricted` TINYINT, `cumul_rent_cnt` INT | penalty state inlined for O(1) reads |
 | `ratings` | (`u_id`, `d_id`) PK, `rating` TINYINT | one row per (user, DVD), upserts overwrite |
