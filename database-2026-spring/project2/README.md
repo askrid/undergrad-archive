@@ -55,3 +55,7 @@ Single file `run.py`. Layers, top to bottom:
 - Candidates: target hasn't rated AND `age_limit <= user.age`. Currently-borrowed-but-unrated DVDs included per spec.
 - Tie-break: `np.lexsort((cand_d, -exp_rs))`. Primary key is the last argument (`-exp_rs` ascending = max first), secondary is `cand_d` ascending (smallest ID wins ties).
 
+## Impression
+
+- It was a nice exercise to actually design a good database schema.
+
