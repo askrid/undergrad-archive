@@ -1,18 +1,15 @@
+# cmake (niche generated files; common ones are in the repo-root .gitignore)
 CMakeLists.txt.user
-CMakeCache.txt
-CMakeFiles
 CMakeScripts
 Testing
 Makefile
-cmake_install.cmake
-install_manifest.txt
-compile_commands.json
-CTestTestfile.cmake
-_deps
 CPack*
 Dart*
+
+# built binaries
 problem1_main
 problem1_test
+
+# local executables, but keep committed expected-output fixtures
 *.out
-.vscode
 !test/*.out

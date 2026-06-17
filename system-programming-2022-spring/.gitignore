@@ -1,48 +1,18 @@
-# Prerequisites
-*.d
+# Project-specific build outputs. Generic C/C++ object, library, shared-object
+# and debug patterns live in the repo-root .gitignore.
 
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
-
-# Linker output
-*.ilk
-*.map
-*.exp
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-
-# Executables
+# Executables (kept local so they don't mask binaries in other projects)
 *.exe
 *.out
 *.app
 *.i*86
 *.x86_64
-*.hex
 
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
+# MS object / linker map (collide with 3D models / source maps elsewhere)
+*.obj
+*.map
 
-# Kernel Module Compile Results
+# Kernel Module Compile Results (kernellab)
 *.mod*
 *.cmd
 .tmp_versions/
@@ -51,9 +21,5 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-# Custom files
+# malloclab driver binary
 mdriver
-
-# Mac File System
-.DS_Store
-

@@ -1,26 +1,12 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# App-specific paths (anchored to this CRA app). Generic Node patterns
+# (node_modules, logs, .env*.local) live in the repo-root .gitignore.
 
-# dependencies
-/node_modules
+# yarn Plug'n'Play
 /.pnp
-.pnp.js
 
-# testing
+# testing / production build
 /coverage
-
-# production
 /build
 
-# misc
-.DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# json server
+# json server data
 /api/_*

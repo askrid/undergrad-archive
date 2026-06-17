@@ -1,9 +1,7 @@
-# build artifacts
-*.o
-*.a
-*.so
-*.d
-.*.d
+# Project-specific outputs. Generic C build, OS, editor and zone-identifier
+# patterns live in the repo-root .gitignore.
+
+# generated library / headers
 etcp/lib/
 etcp/include/etcp_api.h
 etcp/include/etcp_epoll.h
@@ -27,20 +25,6 @@ linux_app/part2/downloaded_*
 *.pcap
 *.log
 cc_trace.log
-
-# Windows zone identifiers
-*:Zone.Identifier
-
-# OS junk
-.DS_Store
-Thumbs.db
-
-# editor
-*.swp
-*.swo
-*~
-.vscode/
-.idea/
 
 # submission artifacts
 *_assign3/

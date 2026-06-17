@@ -1,5 +1,3 @@
-.venv/
-__pycache__/
+# scratch / generated (generic Python + editor patterns are in repo-root)
 tutorial/
-.vscode/
 *.patch

@@ -1,2 +1,68 @@
-**/.DS_Store
+# OS
+.DS_Store
+Thumbs.db
+*:Zone.Identifier
 
+# Editors / IDEs
+.vscode/
+.idea/
+*~
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Node / JS
+node_modules/
+.pnp.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env.local
+.env.*.local
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.ctxt
+.mtj.tmp/
+hs_err_pid*
+
+# C / C++
+*.o
+*.ko
+*.a
+*.la
+*.lo
+*.d
+.*.d
+*.gch
+*.pch
+*.so
+*.so.*
+*.dylib
+*.dll
+*.lib
+*.ilk
+*.exp
+*.elf
+*.hex
+*.su
+*.idb
+*.pdb
+*.dSYM/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+compile_commands.json
+install_manifest.txt
+_deps/
