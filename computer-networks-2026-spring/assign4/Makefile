@@ -1,28 +1,22 @@
-STUDENTID  = 202017316
-SUBMITFILE = $(STUDENTID)_JoonwooChoi_assign4
-TARBALL    = $(SUBMITFILE).tar.gz
+.PHONY: vm ssh up down build run submit clean
 
-SRC = sr_router.c sr_arpcache.c
-PDF = readme.pdf
+vm:
+	./scripts/setup.sh
 
-.PHONY: submit clean check
+ssh:
+	./scripts/ssh.sh
 
-submit: $(TARBALL)
+up:
+	./scripts/sync.sh up
 
-$(TARBALL): $(SRC) $(PDF)
-	rm -rf $(SUBMITFILE)
-	mkdir $(SUBMITFILE)
-	cp $(SRC) $(PDF) $(SUBMITFILE)/
-	tar zcf $(TARBALL) $(SUBMITFILE)
-	rm -rf $(SUBMITFILE)
-	@echo
-	@echo "built: $(TARBALL)"
-	@tar tzf $(TARBALL)
+down:
+	./scripts/sync.sh down
 
-check: $(TARBALL)
-	@echo "archive contents:"
-	@tar tzf $(TARBALL)
+build: up
+	./scripts/ssh.sh "cd SimpleRouter/router && make"
+
+submit:
+	./scripts/submit.sh
 
 clean:
-	rm -rf $(SUBMITFILE) $(TARBALL)
-
+	rm -rf submission/*.tar.gz submission/readme.pdf

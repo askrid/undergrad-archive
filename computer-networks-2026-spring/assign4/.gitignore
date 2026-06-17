@@ -1,0 +1,13 @@
+vendor/
+
+submission/*.tar.gz
+submission/readme.pdf
+
+src/router/.run_logs/
+src/router/*.o
+src/router/.*.d
+src/router/sr
+src/.run_logs/
+
+*.pcap
+.DS_Store
