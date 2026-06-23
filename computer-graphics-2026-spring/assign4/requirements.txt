@@ -1,0 +1,7 @@
+# Ray tracer dependencies.
+# torch provides the GPU compute (CUDA build pulled automatically on Linux);
+# pyglet is used only for the Mat4/Vec3 math in the GlaDOS model layer.
+torch>=2.4
+numpy>=1.26
+pillow>=10.0
+pyglet>=2.0
